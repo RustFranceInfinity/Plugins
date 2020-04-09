@@ -1,0 +1,7 @@
+{
+  "whiteList": [
+    "cupboard",
+    "furnace"
+  ],
+  "DistanceThreshold": 20.0
+}
