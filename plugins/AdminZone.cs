@@ -12,91 +12,95 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("AdminZone", "Ash", "0.1")]
-    [Description("AdminZone")]
+    [Info("AdminZone", "Ash @ Rust France Infinity", "1.0.0")]
+    [Description("création d'une zone statique dand laquelle les joueurs sont invincibles")]
 
     class AdminZone : RustPlugin
     {
         #region Declaration
 
         // Config, instance, plugin references
-        private static ConfigFile cFile;
-        private static AdminZone _instance;
+        [PluginReference] private Plugin ZoneManager, ZoneDomes;
+
+        private static ConfigFile FConfigFile;
+        private static AdminZone FInstance;
+
+        private HashSet<BasePlayer> FAdminZones = new HashSet<BasePlayer>();
 
         // define
-        private Vector3 InvalidLocation = new Vector3(-1f, -1f, -1f);
-        private const float squareSize = 146f;
-        private const float midSquare = squareSize / 2;
-
-        private Dictionary<float, float> FOffsetPerMapSize = new Dictionary<float, float>
-        {
-            [4000f] = 45f,
-            [3500f] = 25f
-        };
 
         // Permissions
-        private const string _perm = "gotosquare.admin";
+        private const string FPermission = "adminzone.admin";
         #endregion
 
         #region Config
 
         private class ConfigFile
         {
-            public float MapSize { get; set; }
+            public float DefaultZoneSize { get; set; }
 
             public static ConfigFile DefaultConfig()
             {
                 return new ConfigFile
                 {
-                    MapSize = 4000f
+                    DefaultZoneSize = 25f
                 };
             }
         }
 
         protected override void LoadDefaultConfig()
         {
-            cFile = ConfigFile.DefaultConfig();
+            FConfigFile = ConfigFile.DefaultConfig();
         }
 
         protected override void LoadConfig()
         {
             base.LoadConfig();
-            cFile = Config.ReadObject<ConfigFile>();
+            FConfigFile = Config.ReadObject<ConfigFile>();
         }
 
-        protected override void SaveConfig() => Config.WriteObject(cFile);
+        protected override void SaveConfig() => Config.WriteObject(FConfigFile);
 
         #endregion
 
         #region Methods
-
-        // a valid coordinate is <aplha>[alpha]<numeric>[numeric]
-        Vector3 DecipherCoordinate(string parCoordinate)
+        void ActivateAdminZone(BasePlayer parPlayer, float parSize)
         {
-            Vector3 result = InvalidLocation;
+            if (!FAdminZones.Contains(parPlayer))
+            {
+                string[] arguments = { "name", "adminZone_" + parPlayer.UserIDString, "enter_message", "Administration en cours", "radius", "", "pvpgod", "true" };
+                arguments[5] = parSize.ToString();
+                bool creationSuccessful = (bool)ZoneManager?.Call("CreateOrUpdateZone", parPlayer.UserIDString, arguments, parPlayer.ServerPosition);
+                if (creationSuccessful)
+                {
+                    FAdminZones.Add(parPlayer);
+                    if (ZoneDomes)
+                    {
+                        bool displaySuccessful = (bool)ZoneDomes?.Call("AddNewDome", parPlayer, parPlayer.UserIDString);
+                        if (!displaySuccessful)
+                            PrintToChat(parPlayer, "something wrong happens when displaying the dome");
+                    }
+                }
+                else
+                    PrintToChat(parPlayer, "something wrong happens when creating the zone");
+            }
+        }
 
-            // find the alpha and numeric part
-            int charPos = 0;
-            int numericPos = parCoordinate.IndexOfAny("0123456789".ToCharArray(), charPos);
-
-            // check the validity of the string
-            if (numericPos < 1 || numericPos > 2)
-                return InvalidLocation;
-
-            // translate to valid coordinate
-            string upperCoord = parCoordinate.ToUpper();
-            int x = numericPos == 1 ? upperCoord[0] - 'A' : upperCoord[1] - 'A' + 26;
-            int y = int.Parse(upperCoord.Substring(numericPos));
-
-            float midMap = cFile.MapSize / 2;
-            result[0] = (x * squareSize + midSquare) - midMap;
-            result[2] = midMap - (y * squareSize + midSquare + (FOffsetPerMapSize.ContainsKey(cFile.MapSize) ? FOffsetPerMapSize[cFile.MapSize] : 0f));
-            result[1] = 100f;
-
-            if (result[0] < -midMap || result[0] > midMap || result[2] < -midMap || result[2] > midMap)
-                return InvalidLocation;
-
-            return result;
+        void DesactivateAdminZone(BasePlayer parPlayer)
+        {
+            if (FAdminZones.Contains(parPlayer))
+            {
+                FAdminZones.Remove(parPlayer);
+                if (ZoneDomes)
+                {
+                    bool undisplaySuccessful = (bool)ZoneDomes?.Call("RemoveExistingDome", parPlayer, parPlayer.UserIDString);
+                    if (!undisplaySuccessful)
+                        PrintToChat(parPlayer, "something wrong happens when undisplaying the dome");
+                }
+                bool eraseSuccessful = (bool)ZoneManager?.Call("EraseZone", parPlayer.UserIDString);
+                if (!eraseSuccessful)
+                    PrintToChat(parPlayer, "something wrong happens when erasing the zone");
+            }
         }
 
         #endregion
@@ -105,27 +109,44 @@ namespace Oxide.Plugins
 
         private void Init()
         {
-            _instance = this;
-            permission.RegisterPermission(_perm, this);
+            FInstance = this;
+            permission.RegisterPermission(FPermission, this);
             SaveConfig();
         }
 
         private void OnServerInitialized()
         {
+            if (!ZoneManager)
+                PrintError("ZoneManager not detected, this plugins will not works");
+            if (!ZoneDomes)
+                PrintWarning("ZoneDomes not detected, this plugins will works but will not display the zones");
+        }
+
+        private void Unload()
+        {
+            foreach (BasePlayer user in FAdminZones)
+                DesactivateAdminZone(user);
+        }
+
+        private void OnPlayerDisconnected(BasePlayer player, string reason)
+        {
+            DesactivateAdminZone(player);
         }
 
         #endregion
 
         #region Plugin API
 
-        [ChatCommand("tp")]
-        void GotoSquare(BasePlayer player, string command, string[] args)
+        // azone <on|off> [size]
+        [ChatCommand("azone")]
+        void CreateAdminZone(BasePlayer parPlayer, string parCommand, string[] parArguments)
         {
-            if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 1)
+            if (permission.UserHasPermission(parPlayer.UserIDString, FPermission) && parArguments.Length >= 1 && ZoneManager)
             {
-                Vector3 destination = DecipherCoordinate(args[0]);
-                if (destination != InvalidLocation)
-                    player.Teleport(destination);
+                if (parArguments[0] == "on")
+                    ActivateAdminZone(parPlayer, (parArguments.Length > 1 ? float.Parse(parArguments[1]) : FConfigFile.DefaultZoneSize));
+                else if (parArguments[0] == "off")
+                    DesactivateAdminZone(parPlayer);
             }
         }
         #endregion
