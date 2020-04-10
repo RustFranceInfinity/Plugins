@@ -25,7 +25,10 @@ namespace Oxide.Plugins
         private static ConfigFile FConfigFile;
         private static AdminZone FInstance;
 
-        private HashSet<BasePlayer> FAdminZones = new HashSet<BasePlayer>();
+        private Dictionary<BasePlayer, Vector3> FAdminZones = new Dictionary<BasePlayer, Vector3>();
+
+        // Timers
+        private Timer FTimer;
 
         // define
 
@@ -38,12 +41,18 @@ namespace Oxide.Plugins
         private class ConfigFile
         {
             public float DefaultZoneSize { get; set; }
+            public float RefreshInterval { get; set; }
+            public float RefreshDistance { get; set; }
+            public bool UseDynamicZone { get; set; }
 
             public static ConfigFile DefaultConfig()
             {
                 return new ConfigFile
                 {
-                    DefaultZoneSize = 25f
+                    DefaultZoneSize = 30f,
+                    RefreshInterval = 3f,
+                    RefreshDistance = 15f,
+                    UseDynamicZone = false
                 };
             }
         }
@@ -64,16 +73,25 @@ namespace Oxide.Plugins
         #endregion
 
         #region Methods
+        bool CreateOrUpdateAdminZone(BasePlayer parPlayer, float parSize = 0f)
+        {
+            List<string> arguments = new List<string>() { "name", "adminZone_" + parPlayer.UserIDString, "enter_message", "Administration en cours", "pvpgod", "true" };
+            if (parSize != 0f)
+            {
+                arguments.Add("radius");
+                arguments.Add(parSize.ToString());
+            }
+            return (bool)ZoneManager?.Call("CreateOrUpdateZone", parPlayer.UserIDString, arguments.ToArray(), parPlayer.ServerPosition);
+        }
+
         void ActivateAdminZone(BasePlayer parPlayer, float parSize)
         {
-            if (!FAdminZones.Contains(parPlayer))
+            if (!FAdminZones.ContainsKey(parPlayer))
             {
-                string[] arguments = { "name", "adminZone_" + parPlayer.UserIDString, "enter_message", "Administration en cours", "radius", "", "pvpgod", "true" };
-                arguments[5] = parSize.ToString();
-                bool creationSuccessful = (bool)ZoneManager?.Call("CreateOrUpdateZone", parPlayer.UserIDString, arguments, parPlayer.ServerPosition);
+                bool creationSuccessful = CreateOrUpdateAdminZone(parPlayer, parSize);
                 if (creationSuccessful)
                 {
-                    FAdminZones.Add(parPlayer);
+                    FAdminZones.Add(parPlayer, parPlayer.ServerPosition);
                     if (ZoneDomes)
                     {
                         bool displaySuccessful = (bool)ZoneDomes?.Call("AddNewDome", parPlayer, parPlayer.UserIDString);
@@ -88,7 +106,7 @@ namespace Oxide.Plugins
 
         void DesactivateAdminZone(BasePlayer parPlayer)
         {
-            if (FAdminZones.Contains(parPlayer))
+            if (FAdminZones.ContainsKey(parPlayer))
             {
                 FAdminZones.Remove(parPlayer);
                 if (ZoneDomes)
@@ -113,6 +131,9 @@ namespace Oxide.Plugins
             AddCovalenceCommand("azone", "ManageAdminZoneCmd");
             permission.RegisterPermission(FPermission, this);
             SaveConfig();
+
+            if (FConfigFile.UseDynamicZone)
+                PrintWarning("Dynamic zone enabled, activation distance= " + FConfigFile.RefreshDistance);
         }
 
         private void OnServerInitialized()
@@ -121,12 +142,46 @@ namespace Oxide.Plugins
                 PrintError("ZoneManager not detected, this plugins will not works");
             if (!ZoneDomes)
                 PrintWarning("ZoneDomes not detected, this plugins will works but will not display the zones");
+            FTimer?.Destroy();
+            if (FConfigFile.UseDynamicZone)
+            {
+                FTimer = timer.Every(FConfigFile.RefreshInterval, () =>
+                {
+                    Dictionary<BasePlayer, Vector3> newPos = new Dictionary<BasePlayer, Vector3>();
+                    foreach (var playerAndPos in FAdminZones)
+                    {
+                        BasePlayer currentPlayer = playerAndPos.Key;
+                        float distance = Vector3.Distance(playerAndPos.Value, currentPlayer.ServerPosition);
+                        if (distance > FConfigFile.RefreshDistance)
+                        {
+                            if (CreateOrUpdateAdminZone(currentPlayer))
+                            {
+                                newPos.Add(currentPlayer, currentPlayer.ServerPosition);
+                                bool undisplaySuccessful = (bool)ZoneDomes?.Call("RemoveExistingDome", currentPlayer, currentPlayer.UserIDString);
+                                if (undisplaySuccessful)
+                                {
+                                    bool displaySuccessful = (bool)ZoneDomes?.Call("AddNewDome", currentPlayer, currentPlayer.UserIDString);
+                                    if (!displaySuccessful)
+                                        PrintToChat(currentPlayer, "something wrong happens when undisplaying the dome");
+                                }
+                                else
+                                    PrintToChat(currentPlayer, "something wrong happens when undisplaying the dome");
+                            }
+                            else
+                                PrintToChat(currentPlayer, "something wrong happens when updateing the zone " + currentPlayer.UserIDString);
+                        }
+                    }
+                    foreach (var playerAndPos in newPos)
+                        FAdminZones[playerAndPos.Key] = playerAndPos.Value;
+
+                });
+            }
         }
 
         private void Unload()
         {
-            foreach (BasePlayer user in FAdminZones)
-                DesactivateAdminZone(user);
+            foreach (var playerAndPos in FAdminZones)
+                DesactivateAdminZone(playerAndPos.Key);
         }
 
         private void OnPlayerDisconnected(BasePlayer player, string reason)

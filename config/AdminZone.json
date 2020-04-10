@@ -1,3 +1,6 @@
 {
-  "DefaultZoneSize": 25.0
+  "DefaultZoneSize": 30.0,
+  "RefreshInterval": 3.0,
+  "RefreshDistance": 15.0,
+  "UseDynamicZone": false
 }
