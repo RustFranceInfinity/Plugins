@@ -95,7 +95,7 @@ namespace Oxide.Plugins
         }
         void OnEntitySpawned(BaseEntity entity)
         {
-            if (entity.PrefabName == SphereEnt)
+            if (entity.PrefabName == SphereEnt && !Spheres.Contains(entity))
                 Spheres.Add(entity);
         }
         void Unload() => DestroyAllSpheres();
