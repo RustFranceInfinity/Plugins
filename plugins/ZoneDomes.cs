@@ -90,6 +90,8 @@ namespace Oxide.Plugins
             LoadData();
             RemoveExisting();
             InitializeDomes();
+
+            PrintWarning("IsMute status= " + configData.IsMute);
         }
         void OnEntitySpawned(BaseEntity entity)
         {
@@ -308,6 +310,7 @@ namespace Oxide.Plugins
         class ConfigData
         {
             public int SphereDarkness { get; set; }
+            public bool IsMute { get; set; }
         }
         private void LoadVariables()
         {
@@ -318,7 +321,8 @@ namespace Oxide.Plugins
         {
             var config = new ConfigData
             {
-                SphereDarkness = 5
+                SphereDarkness = 5,
+                IsMute = false
             };
             SaveConfig(config);
         }
@@ -327,7 +331,11 @@ namespace Oxide.Plugins
         #endregion
 
         #region Messaging
-        private void SendMsg(BasePlayer player, string message, string keyword) => SendReply(player, $"<color=orange>{keyword}</color><color=#939393>{message}</color>");
+        private void SendMsg(BasePlayer player, string message, string keyword)
+        {
+            if (!configData.IsMute)
+                SendReply(player, $"<color=orange>{keyword}</color><color=#939393>{message}</color>");
+        }
         private string GetMsg(string key) => lang.GetMessage(key, this);
 
         Dictionary<string, string> Messages = new Dictionary<string, string>
