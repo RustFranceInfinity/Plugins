@@ -110,6 +110,7 @@ namespace Oxide.Plugins
         private void Init()
         {
             FInstance = this;
+            AddCovalenceCommand("azone", "ManageAdminZoneCmd");
             permission.RegisterPermission(FPermission, this);
             SaveConfig();
         }
@@ -136,17 +137,27 @@ namespace Oxide.Plugins
         #endregion
 
         #region Plugin API
-
         // azone <on|off> [size]
-        [ChatCommand("azone")]
-        void CreateAdminZone(BasePlayer parPlayer, string parCommand, string[] parArguments)
+        private void ManageAdminZoneCmd(IPlayer parPlayer, string parCommand, string[] parArguments)
         {
-            if (permission.UserHasPermission(parPlayer.UserIDString, FPermission) && parArguments.Length >= 1 && ZoneManager)
+            BasePlayer player = (BasePlayer)parPlayer.Object;
+            if (player != null && permission.UserHasPermission(player.UserIDString, FPermission) && parArguments.Length >= 1 && ZoneManager)
             {
                 if (parArguments[0] == "on")
-                    ActivateAdminZone(parPlayer, (parArguments.Length > 1 ? float.Parse(parArguments[1]) : FConfigFile.DefaultZoneSize));
+                {
+                    float radius = FConfigFile.DefaultZoneSize;
+                    try
+                    {
+                        if (parArguments.Length > 1)
+                            radius = float.Parse(parArguments[1]);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    ActivateAdminZone(player, radius);
+                }
                 else if (parArguments[0] == "off")
-                    DesactivateAdminZone(parPlayer);
+                    DesactivateAdminZone(player);
             }
         }
         #endregion
