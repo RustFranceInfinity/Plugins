@@ -1,0 +1,154 @@
+modification de DeathNotes:
+
+dans le fichier de config, remplacer les Player vs Player par 
+    "Death Messages": [
+      {
+        "KillerType": "Player",
+        "VictimType": "Player",
+        "DamageType": "Bullet",
+        "Messages": [
+          "{killer}  ({positionKillerStr}) shot {victim} ({positionStr}) using their {weapon} over a distance of {distance}."
+        ]
+      },
+      {
+        "KillerType": "Player",
+        "VictimType": "Player",
+        "DamageType": "Arrow",
+        "Messages": [
+          "{victim} ({positionStr}) was shot by {killer} ({positionKillerStr}) with their {weapon} over a distance of {distance}."
+        ]
+      },
+      {
+        "KillerType": "Player",
+        "VictimType": "Player",
+        "DamageType": "Heat",
+        "Messages": [
+          "{killer} ({positionKillerStr}) inflamed {victim} ({positionStr}) with their {weapon}."
+        ]
+      },
+      {
+        "KillerType": "Player",
+        "VictimType": "Player",
+        "DamageType": "*",
+        "Messages": [
+          "{killer} ({positionKillerStr}) killed {victim} ({positionStr}) using their {weapon}."
+        ]
+      },
+      {
+        "KillerType": "Player",
+        "VictimType": "Player",
+        "DamageType": "Slash",
+        "Messages": [
+          "{killer} ({positionKillerStr}) slashed {victim} ({positionStr}) into pieces with their {weapon}."
+        ]
+      },
+
+modification de 
+
+      {
+        "KillerType": "Player",
+        "VictimType": "Scientist",
+        "DamageType": "*",
+        "Messages": [
+          "{killer} did not want to be a part of the {victim}'s experiments."
+        ]
+      },
+
+par
+	  
+      {
+        "KillerType": "Player",
+        "VictimType": "Scientist",
+        "DamageType": "*",
+        "Messages": [
+          "{victim} ({positionStr}) was killed by {killer} ({positionKillerStr})"
+        ]
+      },
+	  
+et
+      {
+        "KillerType": "Scientist",
+        "VictimType": "Player",
+        "DamageType": "*",
+        "Messages": [
+          "A {killer} shot down {victim}."
+        ]
+      },
+
+par
+      {
+        "KillerType": "Scientist",
+        "VictimType": "Player",
+        "DamageType": "*",
+        "Messages": [
+          "A {killer} ({positionKillerStr}) shot down {victim} ({positionStr})."
+        ]
+      },
+
+
+dans le fichier .cs
+
+1. ajouter sur la ligne après la '#region Fields': 
+			[PluginReference] private Plugin CoordinateToSquare;
+			
+2. ajouter dans le "private struct DeathData"
+            public string PositionStr { get; set; }
+			public string PositionKillerStr { get; set; }
+
+et dans la partie Dictionary remplacer 
+                ["HitInfo"] = HitInfo,
+
+par
+                ["HitInfo"] = HitInfo,
+                ["PositionStr"] = PositionStr,
+                ["PositionKillerStr"] = PositionKillerStr
+
+3. dans le "var data = new DeathData"
+remplacer
+            var data = new DeathData
+            {
+                VictimEntity = victimEntity,
+                KillerEntity = victimEntity.lastAttacker ?? hitInfo?.Initiator,
+                VictimEntityType = GetCombatEntityType(victimEntity),
+                KillerEntityType = GetCombatEntityType(victimEntity.lastAttacker),
+                DamageType = victimEntity.lastDamage,
+                HitInfo = hitInfo
+            };
+	
+par
+            BaseEntity killer = victimEntity.lastAttacker ?? hitInfo?.Initiator;
+            var data = new DeathData
+            {
+                VictimEntity = victimEntity,
+                KillerEntity = killer,
+                VictimEntityType = GetCombatEntityType(victimEntity),
+                KillerEntityType = GetCombatEntityType(victimEntity.lastAttacker),
+                DamageType = victimEntity.lastDamage,
+                HitInfo = hitInfo,
+                PositionStr = (CoordinateToSquare ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", victimEntity.ServerPosition)}{victimEntity.ServerPosition.ToString().Replace(",", "")}" : "NotAvailable"),
+                PositionKillerStr = (CoordinateToSquare ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", killer.ServerPosition)}{killer.ServerPosition.ToString().Replace(",", "")}" : "NotAvailable")
+            };
+
+4. ajouter dans "private string PopulateMessageVariables", à la ligne en dessous de "replacements.Add("bodypart", GetCustomizedBodypartName(data.HitInfo));"
+		replacements.Add("positionStr", data.PositionStr);
+        replacements.Add("positionKillerStr", data.PositionKillerStr);		
+		
+5. après la fonction 'private void Init', ajouter
+        private void OnServerInitialized()
+        {
+            if (!CoordinateToSquare)
+                PrintWarning("CoordinateToSquare is not present, no position conversion will be used");
+        }
+
+6. après 'using Oxide.Core;', ajouter
+		using Oxide.Core.Plugins;
+
+Modification RaidTracker.cs
+
+	1. ajouter CoordinateToSquare dans '[PluginReference]'
+	2. à la fin de 'private void OnServerInitialized()', ajouter
+            if (!CoordinateToSquare)
+                PrintWarning("CoordinateToSquare is not present, old position conversion will be used");
+	3. dans 'public static string FormatGridReference', ajouter au début de la fonction
+            if (ins.CoordinateToSquare)
+                return $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", position)}{position.ToString().Replace(",", "")}";

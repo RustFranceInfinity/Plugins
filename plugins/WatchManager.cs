@@ -228,10 +228,16 @@ namespace Oxide.Plugins
             }
 
             // create new watch
+            int maxId = 0;
+            foreach (WatchInfo watch in FPlayerDatas.ToList().FindAll((p) => p.FPlayerId == player.userID))
+            {
+                if (watch.FWatchId > maxId)
+                    maxId = watch.FWatchId;
+            }
             WatchInfo watch = new WatchInfo();
             watch.FAdminId = adminId;
             watch.FAdminName = adminName;
-            watch.FWatchId = FPlayerDatas.ToList().FindAll((p) => p.FPlayerId == player.userID).Count + 1;
+            watch.FWatchId = maxId + 1;
             watch.FDate = date;
             watch.FPlayerId = player.userID;
             watch.FPlayerName = player.displayName;

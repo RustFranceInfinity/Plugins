@@ -228,10 +228,16 @@ namespace Oxide.Plugins
             }
 
             // create new averto
+            int maxId = 0;
+            foreach (Averto averto in FPlayerDatas.ToList().FindAll((p) => p.FPlayerId == player.userID))
+            {
+                if (averto.FAvertoId > maxId)
+                    maxId = averto.FAvertoId;
+            }
             Averto averto = new Averto();
             averto.FAdminId = adminId;
             averto.FAdminName = adminName;
-            averto.FAvertoId = FPlayerDatas.ToList().FindAll((p) => p.FPlayerId == player.userID).Count + 1;
+            averto.FAvertoId = maxId + 1;
             averto.FDate = date;
             averto.FPlayerId = player.userID;
             averto.FPlayerName = player.displayName;
@@ -240,7 +246,7 @@ namespace Oxide.Plugins
 
             FPlayerDatas.Add(averto);
             PrintToConsole(parAdmin, "Le joueur " + player.displayName + " a reçu un nouvel avertisssement, c'est le n°" + averto.FAvertoId);
-            PrintToChat(player, "Vous avez reçu un nouvel avertisssement, c'est le n°<color=red>" + averto.FAvertoId + "</color>");
+            PrintToChat(player, "Vous avez reçu un nouvel avertisssement, c'est le n°<color=red>" + FPlayerDatas.ToList().FindAll((p) => p.FPlayerId == player.userID).Count + "</color>");
             Save();
         }
 
