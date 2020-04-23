@@ -1,4 +1,4 @@
-﻿#define DEBUG
+﻿// #define DEBUG
 
 using Newtonsoft.Json;
 using Oxide.Core;
@@ -143,8 +143,8 @@ namespace Oxide.Plugins
                 KillerEntityType = GetCombatEntityType(victimEntity.lastAttacker),
                 DamageType = victimEntity.lastDamage,
                 HitInfo = hitInfo,
-                PositionStr = (CoordinateToSquare ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", victimEntity.ServerPosition)}{victimEntity.ServerPosition.ToString().Replace(",", "")}" : "NotAvailable"),
-                PositionKillerStr = (CoordinateToSquare ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", killer.ServerPosition)}{killer.ServerPosition.ToString().Replace(",", "")}" : "NotAvailable")
+                PositionStr = ((CoordinateToSquare && victimEntity != null) ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", victimEntity.ServerPosition)} ({victimEntity.ServerPosition.ToString().Replace(",", "")})" : "NotAvailable"),
+                PositionKillerStr = ((CoordinateToSquare && killer != null) ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", killer.ServerPosition)} ({killer.ServerPosition.ToString().Replace(",", "")})" : "NotAvailable")
             };
 
             // Handle inconsistencies/exceptions

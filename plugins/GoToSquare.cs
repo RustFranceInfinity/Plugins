@@ -63,11 +63,11 @@ namespace Oxide.Plugins
         [ChatCommand("tpa")]
         void GotoSquareAbsolute(BasePlayer player, string command, string[] args)
         {
-            if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 2)
+            if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 3)
             {
                 try
                 {
-                    Vector3 destination = new Vector3(float.Parse(args[0]), 100f, float.Parse(args[1]));
+                    Vector3 destination = new Vector3(float.Parse(args[0]), float.Parse(args[1]), float.Parse(args[2]));
                     player.Teleport(destination);
                 }
                 catch (ArgumentException e)
