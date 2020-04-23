@@ -30,6 +30,12 @@ namespace Oxide.Plugins
 
         private void Init()
         {
+            // Register univeral chat/console commands
+            AddCovalenceCommand("tp", "GotoSquare");
+            AddCovalenceCommand("tpa", "GotoSquareAbsolute");
+            AddCovalenceCommand("coord", "GetCoordAbsolute");
+
+            // register permission
             permission.RegisterPermission(_perm, this);
         }
 
@@ -43,9 +49,9 @@ namespace Oxide.Plugins
 
         #region Plugin API
 
-        [ChatCommand("tp")]
-        void GotoSquare(BasePlayer player, string command, string[] args)
+        private void GotoSquare(IPlayer parPlayer, string command, string[] args)
         {
+            BasePlayer player = (BasePlayer)parPlayer.Object;
             if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 1 && CoordinateToSquare)
             {
                 try
@@ -60,9 +66,9 @@ namespace Oxide.Plugins
             }
         }
 
-        [ChatCommand("tpa")]
-        void GotoSquareAbsolute(BasePlayer player, string command, string[] args)
+        private void GotoSquareAbsolute(IPlayer parPlayer, string command, string[] args)
         {
+            BasePlayer player = (BasePlayer)parPlayer.Object;
             if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 3)
             {
                 try
@@ -80,9 +86,9 @@ namespace Oxide.Plugins
             }
         }
 
-        [ChatCommand("coord")]
-        void GetCoordAbsolute(BasePlayer player, string command, string[] args)
+        private void GetCoordAbsolute(IPlayer parPlayer, string command, string[] args)
         {
+            BasePlayer player = (BasePlayer)parPlayer.Object;
             if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 0)
             {
                 string square = (string)CoordinateToSquare?.Call("CoordinateToSquare", player.ServerPosition);
