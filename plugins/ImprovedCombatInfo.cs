@@ -5,6 +5,7 @@ using Oxide.Core.Plugins;
 using Rust;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using UnityEngine;
 
@@ -21,6 +22,10 @@ namespace Oxide.Plugins
 
         // Permissions
         private const string FPerm = "improvedcombatinfo.admin";
+
+        // itself
+        private static ImprovedCombatInfo FInstance;
+
         #endregion
 
         // Dictionary<ulong, List<ImprovedHitInfo>> FImprovedHitInfoPerPlayer = new Dictionary<ulong, List<ImprovedHitInfo>>();
@@ -79,6 +84,7 @@ namespace Oxide.Plugins
                     };
                 }
 
+                FInstance.PrintWarning($"Save '{data.FId}' from TryLoad");
                 data.Save();
                 FLoadedPlayerData.Add(data);
             }
@@ -204,7 +210,7 @@ namespace Oxide.Plugins
             BasePlayer victim = parEntity.ToPlayer();
             BasePlayer attacker = attackerEntity.ToPlayer();
 
-            if (BasePlayer.FindBot(victim.userID) || !BasePlayer.activePlayerList.Contains(attacker))
+            if (/*BasePlayer.FindBot(victim.userID) || */!BasePlayer.activePlayerList.Contains(attacker))
                 return;
 
             RecordHitInfo(attacker, victim, parHitInfo, parIsKill);
@@ -245,6 +251,7 @@ namespace Oxide.Plugins
                     iki.FNameFrom = parAttacker.displayName;
                     iki.FNameTo = parVictim.displayName;
                 }
+                PrintWarning($"Save '{attackerPlayerData.FId}' from RecordHitInfo::Attacker");
                 attackerPlayerData.Save();
             }
 
@@ -270,6 +277,7 @@ namespace Oxide.Plugins
                     iki.FNameFrom = parAttacker.displayName;
                     iki.FNameTo = parVictim.displayName;
                 }
+                PrintWarning($"Save '{victimPlayerData.FId}' from RecordHitInfo::Victim");
                 victimPlayerData.Save();
             }
         }
@@ -280,6 +288,7 @@ namespace Oxide.Plugins
         private void Init()
         {
             // Register univeral chat/console commands
+            AddCovalenceCommand("scl", "cmdShowHitInfo");
             AddCovalenceCommand("icl", "cmdListHitInfo");
             AddCovalenceCommand("ikl", "cmdListKill");
             AddCovalenceCommand("ikb", "cmdListKillBy");
@@ -290,11 +299,13 @@ namespace Oxide.Plugins
 
         void OnPlayerConnected(BasePlayer player)
         {
+            FInstance.PrintWarning($"OnPlayerConnected '{player.userID}'");
             PlayerData.TryLoad(player);
         }
 
         void OnPlayerDisconnected(BasePlayer player)
         {
+            FInstance.PrintWarning($"OnPlayerDisconnected '{player.userID}'");
             PlayerData.TryLoad(player);
         }
 
@@ -304,11 +315,16 @@ namespace Oxide.Plugins
 
         void OnServerInitialized()
         {
+            FInstance = this;
+
             if (!CoordinateToSquare)
                 PrintWarning("ImproveCombatLog won't be working at its best because its translator ('CoordinateToSquare') is not present");
 
-            foreach (BasePlayer player in BasePlayer.allPlayerList)
+            foreach (BasePlayer player in BasePlayer.activePlayerList)
+            {
+                FInstance.PrintWarning($"OnServerInitialized '{player.userID}'");
                 PlayerData.TryLoad(player);
+            }
         }
         void OnEntityTakeDamage(BaseCombatEntity parEntity, HitInfo parHitInfo)
         {
@@ -333,6 +349,44 @@ namespace Oxide.Plugins
                     PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim");
                     foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos.OrderByDescending((d) => d.FDate).Take((args.Length >= 2 ? int.Parse(args[1]) : 15)).Reverse())
                         PrintToConsole(player, $"{ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} ");
+                }
+            }
+        }
+
+        private void cmdShowHitInfo(IPlayer parPlayer, string command, string[] args)
+        {
+            BasePlayer player = (BasePlayer)parPlayer.Object;
+            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1)
+            {
+                PlayerData playerData = PlayerData.Find(args[0]);
+                if (playerData != null)
+                {
+                    uint index = 0;
+                    float duration = 60f;
+                    DateTime dateFrom = new DateTime(), dateTo = new DateTime();
+                    bool checkDateFrom = false, checkDateTo = false;
+                    string dateTimeFormat = "dd/MM/yyyy HH:mm:ss";
+                    if (args.Length >= 2 && DateTime.TryParseExact(args[1], dateTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateFrom))
+                        checkDateFrom = true;
+                    if (args.Length >= 3 && DateTime.TryParseExact(args[2], dateTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateTo))
+                        checkDateTo = true;
+
+                    Vector3 currentPosition = player.ServerPosition;
+                    PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim");
+                    foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos.OrderBy((d) => d.FDate))
+                    {
+                        if (Vector3.Distance(currentPosition, ihi.FPositionFrom) < 150f && (!checkDateFrom || DateTime.Compare(ihi.FDate, dateFrom) > 0) && (!checkDateTo || DateTime.Compare(ihi.FDate, dateTo) < 0))
+                        {
+                            PrintToConsole(player, $"{ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} ");
+
+                            Color color = ihi.FIdFrom == playerData.FId ? Color.green : Color.red;
+                            Color invertColor = ihi.FIdFrom == playerData.FId ? Color.red : Color.green;
+                            player.SendConsoleCommand("ddraw.arrow", duration, color, ihi.FPositionTo, ihi.FPositionFrom, 0.25);
+                            player.SendConsoleCommand("ddraw.text", duration, color, ihi.FPositionFrom, ihi.FNameFrom);
+                            player.SendConsoleCommand("ddraw.text", duration, invertColor, ihi.FPositionTo, ihi.FNameTo);
+                            player.SendConsoleCommand("ddraw.text", duration, color, (ihi.FPositionFrom + ihi.FPositionTo) / 2, ++index);
+                        }
+                    }
                 }
             }
         }
