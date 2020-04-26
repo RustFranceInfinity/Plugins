@@ -234,17 +234,17 @@ namespace Oxide.Plugins
                 if (watch.FWatchId > maxId)
                     maxId = watch.FWatchId;
             }
-            WatchInfo watch = new WatchInfo();
-            watch.FAdminId = adminId;
-            watch.FAdminName = adminName;
-            watch.FWatchId = maxId + 1;
-            watch.FDate = date;
-            watch.FPlayerId = player.userID;
-            watch.FPlayerName = player.displayName;
-            watch.FPlayerNameUpper = watch.FPlayerName.ToUpper();
-            watch.FText = parArguments[2];
+            WatchInfo watchInfo = new WatchInfo();
+            watchInfo.FAdminId = adminId;
+            watchInfo.FAdminName = adminName;
+            watchInfo.FWatchId = maxId + 1;
+            watchInfo.FDate = date;
+            watchInfo.FPlayerId = player.userID;
+            watchInfo.FPlayerName = player.displayName;
+            watchInfo.FPlayerNameUpper = watchInfo.FPlayerName.ToUpper();
+            watchInfo.FText = parArguments[2];
 
-            FPlayerDatas.Add(watch);
+            FPlayerDatas.Add(watchInfo);
             PrintToConsole(parAdmin, "Le joueur " + player.displayName + " est maintenant sous surveillance");
             Save();
         }
