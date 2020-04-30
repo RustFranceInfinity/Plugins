@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using Oxide.Core;
+﻿using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
 using Oxide.Core.Plugins;
 using Rust;
@@ -224,10 +223,7 @@ namespace Oxide.Plugins
             foreach (var player in BasePlayer.activePlayerList)
             {
                 if (player.displayName.ToUpper().Contains(uppedName))
-                {
                     playerFounds.Add(player);
-                    break;
-                }
             }
             if (playerFounds.Count == 1)
                 return playerFounds[0];
@@ -236,10 +232,7 @@ namespace Oxide.Plugins
             foreach (var player in BasePlayer.sleepingPlayerList)
             {
                 if (player.displayName.ToUpper() == uppedName)
-                {
                     playerFounds.Add(player);
-                    break;
-                }
             }
             if (playerFounds.Count == 1)
                 return playerFounds[0];
@@ -504,7 +497,7 @@ namespace Oxide.Plugins
                     {
                         if ((Vector3.Distance(currentPosition, ihi.FPositionFrom) < distanceMax || Vector3.Distance(currentPosition, ihi.FPositionTo) < distanceMax) && (!checkDateFrom || DateTime.Compare(ihi.FDate, dateFrom) > 0) && (!checkDateTo || DateTime.Compare(ihi.FDate, dateTo) < 0) && (ihi.FWeaponName != null))
                         {
-                            PrintToConsole(player, $"[{index}] {ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} {ihi.FDamageType.ToString()}");
+                            PrintToConsole(player, $"[{++index}] {ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} {ihi.FDamageType.ToString()}");
 
                             Color color = ihi.FIdFrom == playerData.FId ? Color.green : Color.red;
                             Color invertColor = ihi.FIdFrom == playerData.FId ? Color.red : Color.green;
@@ -513,7 +506,7 @@ namespace Oxide.Plugins
                             player.SendConsoleCommand("ddraw.arrow", duration, color, wristFrom, wristTo, 0.25);
                             player.SendConsoleCommand("ddraw.text", duration, color, wristFrom, ihi.FNameFrom);
                             player.SendConsoleCommand("ddraw.text", duration, invertColor, wristTo, ihi.FNameTo);
-                            player.SendConsoleCommand("ddraw.text", duration, color, (wristFrom + wristTo) / 2, (++index).ToString() + ":-> " + ihi.FWeaponName);
+                            player.SendConsoleCommand("ddraw.text", duration, color, (wristFrom + wristTo) / 2, (index).ToString() + ":-> " + ihi.FWeaponName);
                         }
                     }
                 }
@@ -541,10 +534,17 @@ namespace Oxide.Plugins
                 PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim");
                 foreach (PlayerData playerData in FLoadedPlayerData)
                 {
+                    if (playerData.FImprovedHitInfos == null)
+                        continue;
+
                     foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos.OrderBy((d) => d.FDate))
                     {
-                        if (alreadyShown.Find((p) => p.FDate == ihi.FDate && p.FIdFrom == ihi.FIdTo && p.FIdTo == ihi.FIdFrom) != null)
+                        ImprovedHitInfo foundIhi = alreadyShown.Find((p) => p.FDate == ihi.FDate && p.FIdFrom == ihi.FIdTo && p.FIdTo == ihi.FIdFrom);
+                        if (foundIhi != null)
+                        {
+                            PrintToConsole($"filter ihi {ihi.FDate} {ihi.FIdFrom} {ihi.FIdTo}, already displayed");
                             continue;
+                        }
 
                         if ((Vector3.Distance(currentPosition, ihi.FPositionFrom) < distanceMax || Vector3.Distance(currentPosition, ihi.FPositionTo) < distanceMax) && (!checkDateFrom || DateTime.Compare(ihi.FDate, dateFrom) > 0) && (!checkDateTo || DateTime.Compare(ihi.FDate, dateTo) < 0) && (ihi.FWeaponName != null))
                         {
@@ -560,6 +560,10 @@ namespace Oxide.Plugins
                             player.SendConsoleCommand("ddraw.text", duration, color, (wristFrom + wristTo) / 2, (++index).ToString() + ":-> " + ihi.FWeaponName);
 
                             alreadyShown.Add(ihi);
+                        }
+                        else
+                        {
+                            // PrintToConsole($"did not match the requirement ({Vector3.Distance(currentPosition, ihi.FPositionFrom)} < {distanceMax} || {Vector3.Distance(currentPosition, ihi.FPositionTo)} < {distanceMax}) && (!{checkDateFrom} || {DateTime.Compare(ihi.FDate, dateFrom)} > 0) && (!{checkDateTo} || {DateTime.Compare(ihi.FDate, dateTo)} < 0) && ({ihi.FWeaponName} != null)");
                         }
                     }
                 }

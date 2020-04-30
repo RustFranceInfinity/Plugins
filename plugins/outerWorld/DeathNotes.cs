@@ -22,7 +22,7 @@ namespace Oxide.Plugins
     {
         #region Fields
 
-        [PluginReference] private Plugin CoordinateToSquare;
+        [PluginReference] private Plugin AshTools;
 
         private const string WildcardCharacter = "*";
         private const string CanSeePermission = "deathnotes.cansee";
@@ -101,7 +101,7 @@ namespace Oxide.Plugins
 
         private void OnServerInitialized()
         {
-            if (!CoordinateToSquare)
+            if (!AshTools)
                 PrintWarning("CoordinateToSquare is not present, no position conversion will be used");
         }
 
@@ -143,8 +143,8 @@ namespace Oxide.Plugins
                 KillerEntityType = GetCombatEntityType(victimEntity.lastAttacker),
                 DamageType = victimEntity.lastDamage,
                 HitInfo = hitInfo,
-                PositionStr = ((CoordinateToSquare && victimEntity != null) ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", victimEntity.ServerPosition)} ({victimEntity.ServerPosition.ToString().Replace(",", "")})" : "NotAvailable"),
-                PositionKillerStr = ((CoordinateToSquare && killer != null) ? $"{(string)CoordinateToSquare?.Call("CoordinateToSquare", killer.ServerPosition)} ({killer.ServerPosition.ToString().Replace(",", "")})" : "NotAvailable")
+                PositionStr = ((AshTools && victimEntity != null) ? $"{(string)AshTools?.Call("CoordinateToSquare", victimEntity.ServerPosition)} ({victimEntity.ServerPosition.ToString().Replace(",", "")})" : "NotAvailable"),
+                PositionKillerStr = ((AshTools && killer != null) ? $"{(string)AshTools?.Call("CoordinateToSquare", killer.ServerPosition)} ({killer.ServerPosition.ToString().Replace(",", "")})" : "NotAvailable")
             };
 
             // Handle inconsistencies/exceptions

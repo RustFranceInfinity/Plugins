@@ -20,7 +20,7 @@ namespace Oxide.Plugins
     [Description("Add tracking devices to explosives for detailed raid logging.")]
     public class RaidTracker : RustPlugin
     {
-        [PluginReference] private Plugin Discord, Slack, DiscordMessages, PopupNotifications, EventManager, CoordinateToSquare;
+        [PluginReference] private Plugin Discord, Slack, DiscordMessages, PopupNotifications, EventManager, AshTools;
 
         private bool init;
         private bool wipeData;
@@ -543,7 +543,7 @@ namespace Oxide.Plugins
             if (_sendDiscordMessages && !DiscordMessages)
                 PrintWarning("DiscordMessages not loaded correctly, please check your plugin directory for DiscordMessages.cs file");
 
-            if (!CoordinateToSquare)
+            if (!AshTools)
                 PrintWarning("CoordinateToSquare is not present, old position conversion will be used");
 
             init = true;
@@ -717,8 +717,8 @@ namespace Oxide.Plugins
 
         public static string FormatGridReference(Vector3 position) // Credit: Jake_Rich (modified by Ash)
         {
-            if (ins.CoordinateToSquare)
-                return $"{(string)ins.CoordinateToSquare?.Call("CoordinateToSquare", position)}{position.ToString().Replace(",", "")}";
+            if (ins.AshTools)
+                return $"{(string)ins.AshTools?.Call("CoordinateToSquare", position)}{position.ToString().Replace(",", "")}";
 
             Vector2 roundedPos = new Vector2(World.Size / 2 + position.x, World.Size / 2 - position.z);
             string grid = $"{NumberToLetter((int)(roundedPos.x / 150))}{(int)(roundedPos.y / 150)} {position.ToString().Replace(",", "")}";

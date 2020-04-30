@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Facepunch;
-using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Plugins;
 using UnityEngine;
@@ -13,7 +12,7 @@ using Oxide.Core.Libraries.Covalence;
 namespace Oxide.Plugins
 {
     [Info("WhitelistAndCupboard", "Ash @ Rust France Infinity", "1.0.0")]
-    [Description("check the white list and the cupbaord authorisation to allow damage on the entity")]
+    [Description("check the white list and the cupboard authorization to allow damage on the entity")]
 
     class WhitelistAndCupboard : RustPlugin
     {

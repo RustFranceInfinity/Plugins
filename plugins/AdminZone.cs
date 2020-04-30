@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Facepunch;
-using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Plugins;
 using UnityEngine;
@@ -13,7 +12,7 @@ using Oxide.Core.Libraries.Covalence;
 namespace Oxide.Plugins
 {
     [Info("AdminZone", "Ash @ Rust France Infinity", "1.0.0")]
-    [Description("création d'une zone statique dand laquelle les joueurs sont invincibles")]
+    [Description("création d'une zone statique dans laquelle les joueurs sont invincibles")]
 
     class AdminZone : RustPlugin
     {
@@ -23,7 +22,6 @@ namespace Oxide.Plugins
         [PluginReference] private Plugin ZoneManager, ZoneDomes;
 
         private static ConfigFile FConfigFile;
-        private static AdminZone FInstance;
 
         private Dictionary<BasePlayer, Vector3> FAdminZones = new Dictionary<BasePlayer, Vector3>();
 
@@ -106,19 +104,16 @@ namespace Oxide.Plugins
 
         void DesactivateAdminZone(BasePlayer parPlayer)
         {
-            if (FAdminZones.ContainsKey(parPlayer))
+            FAdminZones.Remove(parPlayer);
+            if (ZoneDomes)
             {
-                FAdminZones.Remove(parPlayer);
-                if (ZoneDomes)
-                {
-                    bool undisplaySuccessful = (bool)ZoneDomes?.Call("RemoveExistingDome", parPlayer, parPlayer.UserIDString);
-                    if (!undisplaySuccessful)
-                        PrintToChat(parPlayer, "something wrong happens when undisplaying the dome");
-                }
-                bool eraseSuccessful = (bool)ZoneManager?.Call("EraseZone", parPlayer.UserIDString);
-                if (!eraseSuccessful)
-                    PrintToChat(parPlayer, "something wrong happens when erasing the zone");
+                bool undisplaySuccessful = (bool)ZoneDomes?.Call("RemoveExistingDome", parPlayer, parPlayer.UserIDString);
+                if (!undisplaySuccessful)
+                    PrintToChat(parPlayer, "something wrong happens when undisplaying the dome");
             }
+            bool eraseSuccessful = (bool)ZoneManager?.Call("EraseZone", parPlayer.UserIDString);
+            if (!eraseSuccessful)
+                PrintToChat(parPlayer, "something wrong happens when erasing the zone");
         }
 
         #endregion
@@ -127,8 +122,9 @@ namespace Oxide.Plugins
 
         private void Init()
         {
-            FInstance = this;
+            // Register univeral chat/console commands
             AddCovalenceCommand("azone", "ManageAdminZoneCmd");
+
             permission.RegisterPermission(FPermission, this);
             SaveConfig();
 
@@ -136,12 +132,16 @@ namespace Oxide.Plugins
                 PrintWarning("Dynamic zone enabled, activation distance= " + FConfigFile.RefreshDistance);
         }
 
-        private void OnServerInitialized()
+        private void Loaded()
         {
             if (!ZoneManager)
                 PrintError("ZoneManager not detected, this plugins will not works");
             if (!ZoneDomes)
                 PrintWarning("ZoneDomes not detected, this plugins will works but will not display the zones");
+        }
+
+        private void OnServerInitialized()
+        {
             FTimer?.Destroy();
             if (FConfigFile.UseDynamicZone)
             {
@@ -191,28 +191,22 @@ namespace Oxide.Plugins
 
         #endregion
 
-        #region Plugin API
-        // azone <on|off> [size]
+        #region Command
+
         private void ManageAdminZoneCmd(IPlayer parPlayer, string parCommand, string[] parArguments)
         {
+            if (!parPlayer.HasPermission(FPermission) || !ZoneManager)
+                return;
+
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (player != null && permission.UserHasPermission(player.UserIDString, FPermission) && parArguments.Length >= 1 && ZoneManager)
+            if (FAdminZones.ContainsKey(player))
+                DesactivateAdminZone(player);
+            else
             {
-                if (parArguments[0] == "on")
-                {
-                    float radius = FConfigFile.DefaultZoneSize;
-                    try
-                    {
-                        if (parArguments.Length > 1)
-                            radius = float.Parse(parArguments[1]);
-                    }
-                    catch (Exception)
-                    {
-                    }
-                    ActivateAdminZone(player, radius);
-                }
-                else if (parArguments[0] == "off")
-                    DesactivateAdminZone(player);
+                float radius;
+                if (parArguments.Length == 0 || !float.TryParse(parArguments[1], out radius))
+                    radius = FConfigFile.DefaultZoneSize;
+                ActivateAdminZone(player, radius);
             }
         }
         #endregion

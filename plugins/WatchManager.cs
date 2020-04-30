@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿// Requires: AshTools
+
 using Oxide.Core.Libraries.Covalence;
 using Oxide.Core;
 using System;
@@ -11,9 +12,13 @@ namespace Oxide.Plugins
     [Description("Watch manager, track people to watch and inform admin at connection")]
     class WatchManager : RustPlugin
     {
+        // Require plugins
+        AshTools FTools;
+
         static HashSet<WatchInfo> FPlayerDatas;
         static List<WatchInfo> FWatchWaitingForRemoval;
 
+        // Permissions
         private const string perm = "watchmanager.admin";
         private string Lang(string key, string id = null, params object[] args) => string.Format(lang.GetMessage(key, this, id), args);
 
@@ -61,7 +66,7 @@ namespace Oxide.Plugins
                 }
                 catch (Exception)
                 {
-                    BasePlayer playerFound = GetPlayerActifOnTheServerByIdOrNameIFN(parPlayer);
+                    BasePlayer playerFound = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parPlayer);
                     if (playerFound != null)
                         data = RetrieveAllWatch(playerFound.UserIDString);
                 }
@@ -86,90 +91,6 @@ namespace Oxide.Plugins
             return data;
         }
 
-        BasePlayer GetPlayerActifOnTheServerByIdOrNameIFN(string parIdOrName)
-        {
-            BasePlayer playerFound = null;
-            try
-            {
-                ulong id = ulong.Parse(parIdOrName);
-                foreach (BasePlayer player in BasePlayer.activePlayerList)
-                {
-                    if (player.userID == id)
-                    {
-                        playerFound = player;
-                        break;
-                    }
-                }
-                if (playerFound == null)
-                {
-                    foreach (BasePlayer player in BasePlayer.sleepingPlayerList)
-                    {
-                        if (player.userID == id)
-                        {
-                            playerFound = player;
-                            break;
-                        }
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                foreach (var player in BasePlayer.activePlayerList)
-                {
-                    if (player.displayName.ToUpper() == parIdOrName)
-                    {
-                        playerFound = player;
-                        break;
-                    }
-                }
-                if (playerFound == null)
-                {
-                    foreach (var player in BasePlayer.sleepingPlayerList)
-                    {
-                        if (player.displayName.ToUpper() == parIdOrName)
-                        {
-                            playerFound = player;
-                            break;
-                        }
-                    }
-                }
-                if (playerFound == null)
-                {
-                    List<BasePlayer> playerFounds = new List<BasePlayer>();
-                    foreach (var player in BasePlayer.activePlayerList)
-                    {
-                        if (player.displayName.ToUpper().Contains(parIdOrName))
-                        {
-                            playerFounds.Add(player);
-                            break;
-                        }
-                    }
-                    if (playerFounds.Count == 1)
-                    {
-                        playerFound = playerFounds[0];
-                    }
-                }
-                if (playerFound == null)
-                {
-                    List<BasePlayer> playerFounds = new List<BasePlayer>();
-                    foreach (var player in BasePlayer.sleepingPlayerList)
-                    {
-                        if (player.displayName.ToUpper() == parIdOrName)
-                        {
-                            playerFounds.Add(player);
-                            break;
-                        }
-                    }
-                    if (playerFounds.Count == 1)
-                    {
-                        playerFound = playerFounds[0];
-                    }
-                }
-            }
-
-            return playerFound;
-        }
-
         // draw usage
         void DisplayUsage(BasePlayer parPlayer)
         {
@@ -186,7 +107,7 @@ namespace Oxide.Plugins
                 return;
             }
 
-            BasePlayer player = GetPlayerActifOnTheServerByIdOrNameIFN(parArguments[1].ToUpper());
+            BasePlayer player = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[1].ToUpper());
             if (player == null)
             {
                 PrintToConsole(parAdmin, string.Format(lang.GetMessage("DoNotExists", this, parAdmin.UserIDString), parArguments[1]));
@@ -201,7 +122,7 @@ namespace Oxide.Plugins
             // overwrite admin information
             if (argSize > 3)
             {
-                BasePlayer adminPlayer = GetPlayerActifOnTheServerByIdOrNameIFN(parArguments[3].ToUpper());
+                BasePlayer adminPlayer = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[3].ToUpper());
                 if (adminPlayer != null)
                 {
                     adminId = adminPlayer.userID;
@@ -402,6 +323,8 @@ namespace Oxide.Plugins
 
         void OnServerInitialized()
         {
+            FTools = (AshTools)Manager.GetPlugin("AshTools");
+
             LoadDatas();
             FWatchWaitingForRemoval = new List<WatchInfo>();
             foreach (WatchInfo watch in FPlayerDatas)

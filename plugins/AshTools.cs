@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Facepunch;
-using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Plugins;
 using UnityEngine;
@@ -12,10 +11,10 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("CoordinateToSquare", "Ash @ Rust France Infinity", "1.0.0")]
-    [Description("translate coordinate to square an square to coordinate")]
+    [Info("AshTools", "Ash @ Rust France Infinity", "1.0.0")]
+    [Description("Some tools useful for many plugins")]
 
-    class CoordinateToSquare : RustPlugin
+    class AshTools : RustPlugin
     {
         #region Declaration
 
@@ -41,7 +40,7 @@ namespace Oxide.Plugins
             float offset = FOffsetPerMapSize.ContainsKey(mapSize) ? FOffsetPerMapSize[mapSize] : 0f;
             int nbSquare = (int)((mapSize - offset) / squareSize);
             squareSize = (mapSize - offset) / nbSquare;
-            PrintWarning("mapSize= " + mapSize + ", offset = " + offset + ", nbSquare= " + nbSquare + ", squareSize recalibrated to= " + squareSize);
+            PrintWarning("mapSize= " + mapSize + ", offset = " + offset + ", nbSquare= " + nbSquare + ", squareSize re calibrated to= " + squareSize);
         }
 
         #endregion
@@ -121,6 +120,44 @@ namespace Oxide.Plugins
                 throw new ArgumentException("Invalid location provided, location is outside of the map: " + result);
 
             return result;
+        }
+
+        [HookMethod("GetPlayerActifOnTheServerByIdOrNameIFN")]
+        private BasePlayer GetPlayerActifOnTheServerByIdOrNameIFNCmd(object parIdOrName)
+        {
+            // convert to BaseCombatEntity and check
+            string idOrName = null;
+            if (parIdOrName is string)
+                idOrName = parIdOrName as string;
+            if (parIdOrName == null || idOrName == null)
+                throw new ArgumentException("idOrName is invalid: " + parIdOrName);
+
+            IPlayer iPlayer = covalence.Players.FindPlayer(idOrName);
+
+            if (iPlayer != null && iPlayer is BasePlayer)
+                return iPlayer as BasePlayer;
+
+            // peut etre le nom partiel d'un joueur actif
+            string uppedName = idOrName.ToUpper();
+            List<BasePlayer> playerFounds = new List<BasePlayer>();
+            foreach (var player in BasePlayer.activePlayerList)
+            {
+                if (player.displayName.ToUpper().Contains(uppedName))
+                    playerFounds.Add(player);
+            }
+            if (playerFounds.Count == 1)
+                return playerFounds[0];
+
+            // ou le nom partiel d'un joueur endormi
+            foreach (var player in BasePlayer.sleepingPlayerList)
+            {
+                if (player.displayName.ToUpper() == uppedName)
+                    playerFounds.Add(player);
+            }
+            if (playerFounds.Count == 1)
+                return playerFounds[0];
+
+            return null;
         }
 
         #endregion

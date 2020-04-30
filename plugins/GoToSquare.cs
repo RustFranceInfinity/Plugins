@@ -1,9 +1,10 @@
-﻿using System;
+﻿// Requires: AshTools
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Facepunch;
-using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Plugins;
 using UnityEngine;
@@ -12,7 +13,7 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("GoToSquare", "Ash @ Rust France Infinity", "1.0.1")]
+    [Info("GoToSquare", "Ash @ Rust France Infinity", "1.0.2")]
     [Description("Teleport to the center of the square")]
 
     class GoToSquare : RustPlugin
@@ -20,7 +21,7 @@ namespace Oxide.Plugins
         #region Declaration
 
         // Config, instance, plugin references
-        [PluginReference] private Plugin CoordinateToSquare;
+        AshTools FTools;
 
         // Permissions
         private const string _perm = "gotosquare.admin";
@@ -30,7 +31,7 @@ namespace Oxide.Plugins
 
         private void Init()
         {
-            // Register univeral chat/console commands
+            // Register universal chat/console commands
             AddCovalenceCommand("tp", "GotoSquare");
             AddCovalenceCommand("tpa", "GotoSquareAbsolute");
             AddCovalenceCommand("coord", "GetCoordAbsolute");
@@ -41,8 +42,7 @@ namespace Oxide.Plugins
 
         private void OnServerInitialized()
         {
-            if (!CoordinateToSquare)
-                PrintWarning("GoToSquare won't be working as its translator ('CoordinateToSquare') is not present");
+            FTools = (AshTools)Manager.GetPlugin("AshTools");
         }
 
         #endregion
@@ -52,11 +52,11 @@ namespace Oxide.Plugins
         private void GotoSquare(IPlayer parPlayer, string command, string[] args)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 1 && CoordinateToSquare)
+            if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 1)
             {
                 try
                 {
-                    Vector3 destination = (Vector3)CoordinateToSquare?.Call("SquareToCoordinate", args[0]);
+                    Vector3 destination = (Vector3)FTools.Call("SquareToCoordinate", args[0]);
                     player.Teleport(destination);
                 }
                 catch (ArgumentException e)
@@ -91,7 +91,7 @@ namespace Oxide.Plugins
             BasePlayer player = (BasePlayer)parPlayer.Object;
             if (permission.UserHasPermission(player.UserIDString, _perm) && args.Length == 0)
             {
-                string square = (string)CoordinateToSquare?.Call("CoordinateToSquare", player.ServerPosition);
+                string square = (string)FTools.Call("CoordinateToSquare", player.ServerPosition);
                 PrintToChat(player, "coordinate= " + player.ServerPosition + " => " + square);
             }
         }
