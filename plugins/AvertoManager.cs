@@ -1,19 +1,18 @@
-﻿// Requires: AshTools
-
-using Oxide.Core.Libraries.Covalence;
+﻿using Oxide.Core.Libraries.Covalence;
 using Oxide.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
-    [Info("Averto", "Ash @ Rust France Infinity", "1.0.0")]
+    [Info("Averto", "Ash @ Rust France Infinity", "1.0.2")]
     [Description("Avertissements manager")]
     class AvertoManager : RustPlugin
     {
         // Config, instance, plugin references
-        AshTools FTools;
+        [PluginReference] private Plugin AshTools;
 
         static HashSet<Averto> FPlayerDatas;
         static List<Averto> FAvertoWaitingForRemoval;
@@ -66,7 +65,7 @@ namespace Oxide.Plugins
                 }
                 catch (Exception)
                 {
-                    BasePlayer playerFound = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parPlayer);
+                    BasePlayer playerFound = (BasePlayer)AshTools?.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parPlayer);
                     if (playerFound != null)
                         data = RetrieveAllAverto(playerFound.UserIDString);
                 }
@@ -107,7 +106,7 @@ namespace Oxide.Plugins
                 return;
             }
 
-            BasePlayer player = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[1].ToUpper());
+            BasePlayer player = (BasePlayer)AshTools?.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[1].ToUpper());
             if (player == null)
             {
                 PrintToConsole(parAdmin, string.Format(lang.GetMessage("DoNotExists", this, parAdmin.UserIDString), parArguments[1]));
@@ -122,7 +121,7 @@ namespace Oxide.Plugins
             // overwrite admin information
             if (argSize > 3)
             {
-                BasePlayer adminPlayer = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[3].ToUpper());
+                BasePlayer adminPlayer = (BasePlayer)AshTools?.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[3].ToUpper());
                 if (adminPlayer != null)
                 {
                     adminId = adminPlayer.userID;
@@ -242,7 +241,7 @@ namespace Oxide.Plugins
                             currentPlayer = averto.FPlayerName;
                             PrintToConsole(parPlayer, "<color=green>" + averto.FPlayerName + "</color>(" + averto.FPlayerId + ") a reçu <color=red>" + FPlayerDatas.ToList().FindAll((p) => p.FPlayerName == averto.FPlayerName).Count + "</color> avertisssement(s)");
                         }
-                        PrintToConsole(parPlayer, "[" + averto.FAvertoId + "] Le " + averto.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=green>" + averto.FText + "</color> par " + averto.FAdminName);
+                        PrintToConsole(parPlayer, "<color=red>" + averto.FAvertoId + "</color> Le " + averto.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=yellow>" + averto.FText + "</color> par " + averto.FAdminName);
                     }
                 }
                 else if (removed == 0)
@@ -262,7 +261,7 @@ namespace Oxide.Plugins
             if (parArguments.Length == 1)
             {
                 foreach (Averto averto in FPlayerDatas.OrderBy((d) => d.FDate))
-                    PrintToConsole(parPlayer, "<color=green>" + averto.FPlayerName + "</color> (" + averto.FPlayerId + ") [" + averto.FAvertoId + "] le " + averto.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=green>" + averto.FText + "</color> par " + averto.FAdminName);
+                    PrintToConsole(parPlayer, "<color=green>" + averto.FPlayerName + "</color> (" + averto.FPlayerId + ") [<color=red>" + averto.FAvertoId + "</color>] le " + averto.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=yellow>" + averto.FText + "</color> par " + averto.FAdminName);
             }
             else if (parArguments[1] == "size")
             {
@@ -285,7 +284,7 @@ namespace Oxide.Plugins
                             currentPlayer = averto.FPlayerName;
                             PrintToConsole(parPlayer, "<color=green>" + averto.FPlayerName + "</color>(" + averto.FPlayerId + ") a reçu <color=red>" + FPlayerDatas.ToList().FindAll((p) => p.FPlayerName == averto.FPlayerName).Count + "</color> avertisssement(s)");
                         }
-                        PrintToConsole(parPlayer, "[" + averto.FAvertoId + "] Le " + averto.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=green>" + averto.FText + "</color> par " + averto.FAdminName);
+                        PrintToConsole(parPlayer, "<color=red>" + averto.FAvertoId + "</color> Le " + averto.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=yellow>" + averto.FText + "</color> par " + averto.FAdminName);
                     }
                 }
             }
@@ -324,7 +323,8 @@ namespace Oxide.Plugins
 
         void OnServerInitialized()
         {
-            FTools = (AshTools)Manager.GetPlugin("AshTools");
+            if (!AshTools)
+                PrintError("AshTools is not present, this plugins will not works");
 
             LoadDatas();
             FAvertoWaitingForRemoval = new List<Averto>();
@@ -337,7 +337,7 @@ namespace Oxide.Plugins
         private void AvertoCommand(IPlayer parPlayer, string parCommand, string[] parArguments)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (!permission.UserHasPermission(player.UserIDString, perm))
+            if (!permission.UserHasPermission(player.UserIDString, perm) || !AshTools)
                 return;
 
             if (parArguments.Length == 0)

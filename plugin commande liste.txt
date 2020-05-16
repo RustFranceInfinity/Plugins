@@ -1,0 +1,40 @@
+Permission et commandes
+dans le cas des commandes, les chevrons '<>' sont là pour indiquer des paramètre obligatoire, les crochets '[]' pour les paramètres optionnel
+
+AdminZone (version 1.0.1)
+	- permission: adminzone.admin
+	- commande (console ou chat (en ajoutant le '/'))
+		- azone [taille] -> active ou désactive une zone dans laquelle le god mode est actif pour tous les joueurs ([taille] pour changer la taille présente par défaut en config)
+
+AvertoManager (version 1.0.1)
+	- permission: avertomanager.admin
+	- commande (console ou chat (en ajoutant le '/'))
+		- averto list [nom] -> voir tous les avertissements donnés [pour un joueur donné)
+		- averto add <nom> <motif> -> ajouté un avertisssement (le joueur est notifié du nombre d'avertissement reçu)
+		- averto remove <nom> [id] -> supprime un avertissement pour un joueur (en option l'id de l'avertissement)
+		- averto remove confirm -> valide la suppression d'un avertissement
+
+GoToSquare (version 1.0.3)
+	- permission: gotosquare.admin
+	- commande (console ou chat (en ajoutant le '/'))
+		- tp <case> -> téléporte à la case
+		- tpa <x> <z> <y> -> téléporte à la position donnée (en lien avec les infos de DeathNote et ImprovedCombatLog, c'est plus facile)
+		- coord -> affiche  les coordonnée x z y de la position actuelle
+
+ImprovedCombatInfo (version 1.0.1)
+	- permission: improvedcombatinfo.admin
+	- commande (console ou chat (en ajoutant le '/'))
+		- icl <nom ou id> [nombre de ligne] --> les 15 derniers tirs enregistré avec la position tireur et victime
+		- ikl <nom ou id> --> la liste des tués du joueur
+		- ikb <nom ou id> --> la liste des tueur du joueur
+		- scl <nom ou id> --> visualisation des tirs dans la zone
+		- scl_all --> visualisation de tous les tirs dans la zone
+
+WatchManager (version 1.0.1)
+	- permission: watchmanager.admin
+	- commande (console ou chat (en ajoutant le '/'))
+		- watch list [nom] -> voir tous les joueurs sous surveillance [pour un joueur donné]
+		- watch add <nom> <motif> [durée en jour] -> ajouté une surveillance (le joueur n'est pas notifié) [pour un certain nombre de jour (0.5: 12h, etc...)]
+		- watch remove <nom> [id] -> supprime une surveillance pour un joueur (en option l'id de la surveillance)
+		- watch remove confirm -> valide la suppression d'une surveillance
+

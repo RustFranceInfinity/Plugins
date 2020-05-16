@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Vanish", "Whispers88", "1.2.2")]
+    [Info("Vanish", "Whispers88", "1.3.0")]
     [Description("Allows players with permission to become invisible. Credits to Nivex & Wulf")]
     public class Vanish : RustPlugin
     {
@@ -18,7 +18,7 @@ namespace Oxide.Plugins
         #region Configuration
         private readonly List<BasePlayer> _hiddenPlayers = new List<BasePlayer>();
         private readonly List<BasePlayer> _hiddenOffline = new List<BasePlayer>();
-        private static List<string> _registeredhooks = new List<string> { "OnNpcTarget", "CanBeTargeted", "CanHelicopterTarget", "CanHelicopterStrafeTarget", "CanBradleyApcTarget", "CanUseLockedEntity", "OnEntityTakeDamage", "OnPlayerDisconnected", "CanNetworkTo" };
+        private static List<string> _registeredhooks = new List<string> { "OnNpcTarget", "CanBeTargeted", "CanHelicopterTarget", "CanHelicopterStrafeTarget", "CanBradleyApcTarget", "CanUseLockedEntity", "OnEntityTakeDamage", "OnPlayerDisconnected" };
         private static readonly DamageTypeList _EmptyDmgList = new DamageTypeList();
         private static readonly Dictionary<ulong, string> GuiGuids = new Dictionary<ulong, string>();
 
@@ -26,8 +26,8 @@ namespace Oxide.Plugins
 
         public class Configuration
         {
-            [JsonProperty("Automatically update permissions from old versions of vanish (only needs to be run once)")]
-            public bool RenamePerms = true;
+            [JsonProperty("NoClip on Vanish (runs noclip command)")]
+            public bool NoClipOnVanish = true;
 
             [JsonProperty("Hide an invisible players body under the terrain after disconnect")]
             public bool HideOnDisconnect = false;
@@ -150,13 +150,6 @@ namespace Oxide.Plugins
             //Unsubscribe from hooks
             UnSubscribeFromHooks();
 
-            //Rename old permissions
-            if (config.RenamePerms)
-            {
-                RenamePerms("vanish.use", "vanish.allow");
-                RenamePerms("vanish.collsion", "vanish.collision");
-            }
-
             foreach (var player in BasePlayer.activePlayerList)
             {
                 if (HasPerm(player.UserIDString, permavanish))
@@ -204,6 +197,7 @@ namespace Oxide.Plugins
             }
             if (IsInvisible(player)) Reappear(player);
             else Disappear(player);
+            
         }
 
         private void CollisionToggle(IPlayer iplayer, string command, string[] args)
@@ -255,7 +249,11 @@ namespace Oxide.Plugins
             string guiId;
             if (GuiGuids.TryGetValue(player.userID, out guiId)) CuiHelper.DestroyUi(player, guiId);
 
+            if (config.NoClipOnVanish && player.IsFlying) player.SendConsoleCommand("noclip");
+
             if (config.EnableNotifications) Message(player.IPlayer, "Reappear");
+
+            UnityEngine.Object.Destroy(player.GetComponent<GroupSwitchTimer>());
         }
 
         private void Disappear(BasePlayer player)
@@ -268,32 +266,11 @@ namespace Oxide.Plugins
             player.drownEffect = new GameObjectRef();
             AntiHack.ShouldIgnore(player);
             if (_hiddenPlayers.Count == 0) SubscribeToHooks();
-
-            //player._limitedNetworking = true;
-
+            player._limitedNetworking = true;
             player.UpdatePlayerCollider(false);
-
-
             var connections = Net.sv.connections.Where(con => con.connected && con.isAuthenticated && con.player is BasePlayer && con.player != player).ToList();
             player.OnNetworkSubscribersLeave(connections);
-
-
-            //HeldEntity heldEntity = player.GetHeldEntity();
-            //if (heldEntity != null)
-            //{
-            //    heldEntity.SetHeld(false);
-            //    heldEntity.UpdateVisiblity_Invis();
-            //    heldEntity.SendNetworkUpdate();
-            //}
-
-            //if (Net.sv.write.Start())
-            //{
-            //    Net.sv.write.PacketID(Network.Message.Type.EntityDestroy);
-            //    Net.sv.write.EntityID(player.net.ID);
-            //    Net.sv.write.UInt8((byte)BaseNetworkable.DestroyMode.None);
-            //    Net.sv.write.Send(new SendInfo(connections));
-            //}
-
+            player.gameObject.AddComponent<GroupSwitchTimer>();
             _hiddenPlayers.Add(player);
 
             if (config.EnableSound)
@@ -307,6 +284,7 @@ namespace Oxide.Plugins
                     SendEffect(player, config.VanishSoundEffect);
                 }
             }
+            if (config.NoClipOnVanish && !player.IsFlying) player.SendConsoleCommand("noclip");
 
             if (config.EnableGUI) VanishGui(player);
 
@@ -316,23 +294,6 @@ namespace Oxide.Plugins
         #endregion Commands
 
         #region Hooks
-        // Hide from other players
-        private object CanNetworkTo(BaseNetworkable entity, BasePlayer target)
-        {
-            var basePlayer = entity as BasePlayer ?? (entity as HeldEntity)?.GetOwnerPlayer();
-            if (basePlayer == null || target == null || basePlayer == target)
-            {
-                return null;
-            }
-
-            if (IsInvisible(basePlayer))
-            {
-                return false;
-            }
-
-            return null;
-        }
-
         private void OnPlayerConnected(BasePlayer player)
         {
             if (HasPerm(player.UserIDString, permavanish) || _hiddenOffline.Contains(player))
@@ -400,8 +361,29 @@ namespace Oxide.Plugins
             }
             if (_hiddenPlayers.Count == 0) UnSubscribeFromHooks();
             if (config.HideOnReconnect) _hiddenOffline.Add(player);
+
+            UnityEngine.Object.Destroy(player.GetComponent<GroupSwitchTimer>());
         }
         #endregion Hooks
+
+        #region FacePunch Behaviour 
+        public class GroupSwitchTimer : FacepunchBehaviour
+        {
+            private BasePlayer _player;
+
+            private void Awake()
+            {
+                _player = GetComponent<BasePlayer>();
+                InvokeRepeating("UpdateNetworkGroups", 2f, 1f);
+            }
+
+            private void UpdateNetworkGroups()
+            {
+                using (TimeWarning.New("VanishGroup"))
+                    _player.net.UpdateGroups(_player.transform.position);
+            }
+        }
+        #endregion
 
         #region GUI
 
@@ -489,48 +471,6 @@ namespace Oxide.Plugins
             var effect = new Effect(sound, player, 0, Vector3.zero, Vector3.forward);
             EffectNetwork.Send(effect, player.net.connection);
         }
-
-        private void RenamePerms(string oldPerm, string newPerm)
-        {
-            int i = 0;
-            foreach (string group in permission.GetGroups())
-            {
-                if (permission.GroupHasPermission(group, oldPerm))
-                {
-                    permission.GrantGroupPermission(group, newPerm, null);
-                    permission.RevokeGroupPermission(group, oldPerm);
-                    i++;
-                }
-            }
-            Puts($"Found {i.ToString()} groups with the perm {oldPerm}");
-            if (i > 0) Puts("Granting new perms");
-
-            var users = new List<string>();
-            foreach (string player in permission.GetPermissionUsers(oldPerm))
-            {
-                string userId = player.Split('(')[0].Trim();
-                users.Add(userId);
-            }
-
-            Puts($"Found {users.Count.ToString()} users with the perm {oldPerm}");
-            if (users.Count > 0)
-            {
-                Puts("Removing old permission from players..");
-
-                foreach (string playerId in users)
-                {
-                    permission.RevokeUserPermission(playerId, oldPerm);
-                }
-                Puts("Removed permissions");
-                Puts("Granting new perms");
-                foreach (string playerId in users)
-                {
-                    rust.RunServerCommand($"oxide.grant user {playerId} {newPerm}");
-                }
-            }
-            Puts("Finished upgrading permissions");
-        }
-
 
         #endregion Helpers
 

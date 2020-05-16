@@ -420,9 +420,9 @@ namespace Oxide.Plugins
             {
             }
 
-            PrintToConsole($"id name kills deaths KDR");
+            PrintToConsole(player, $"id name kills deaths KDR");
             foreach (PlayerData data in LoadedPlayerData.OrderByDescending((d) => d.kills).Take(size))
-                PrintToConsole($"{data.id} {data.name} {data.kills} {data.deaths} {data.KDR}");
+                PrintToConsole(player, $"{data.id} {data.name} {data.kills} {data.deaths} {data.KDR}");
         }
         void DrawKDRWindow(BasePlayer player)
         {

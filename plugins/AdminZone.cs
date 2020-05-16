@@ -11,7 +11,7 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("AdminZone", "Ash @ Rust France Infinity", "1.0.0")]
+    [Info("AdminZone", "Ash @ Rust France Infinity", "1.0.2")]
     [Description("création d'une zone statique dans laquelle les joueurs sont invincibles")]
 
     class AdminZone : RustPlugin
@@ -168,7 +168,7 @@ namespace Oxide.Plugins
                                     PrintToChat(currentPlayer, "something wrong happens when undisplaying the dome");
                             }
                             else
-                                PrintToChat(currentPlayer, "something wrong happens when updateing the zone " + currentPlayer.UserIDString);
+                                PrintToChat(currentPlayer, "something wrong happens when updating the zone " + currentPlayer.UserIDString);
                         }
                     }
                     foreach (var playerAndPos in newPos)
@@ -204,7 +204,7 @@ namespace Oxide.Plugins
             else
             {
                 float radius;
-                if (parArguments.Length == 0 || !float.TryParse(parArguments[1], out radius))
+                if (parArguments.Length == 0 || !float.TryParse(parArguments[0], out radius))
                     radius = FConfigFile.DefaultZoneSize;
                 ActivateAdminZone(player, radius);
             }

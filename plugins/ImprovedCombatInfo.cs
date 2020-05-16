@@ -10,10 +10,13 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("ImprovedCombatInfo", "Ash @ rust France Infinity", "1.0.0")]
+    [Info("ImprovedCombatInfo", "Ash @ rust France Infinity", "1.0.3")]
     [Description("Log hit, death, location and more")]
     class ImprovedCombatInfo : RustPlugin
     {
+        // Config, instance, plugin references
+        [PluginReference] private Plugin AshTools;
+
         #region Configuration
         private static ConfigurationFile FConfigFile;
 
@@ -23,6 +26,7 @@ namespace Oxide.Plugins
             public float DelayBetweenSave { get; set; }
             public float DistanceShowSingle { get; set; }
             public float DistanceShowAll { get; set; }
+            public bool FilterHazardousDamage { get; set; }
 
             public static ConfigurationFile DefaultConfig()
             {
@@ -31,7 +35,8 @@ namespace Oxide.Plugins
                     DisplayDuration = 60f,
                     DelayBetweenSave = 300f,
                     DistanceShowSingle = 150f,
-                    DistanceShowAll = 50f
+                    DistanceShowAll = 50f,
+                    FilterHazardousDamage = true
                 };
             }
         }
@@ -179,14 +184,12 @@ namespace Oxide.Plugins
 
             internal static PlayerData Find(string playerIdOrName)
             {
-                BasePlayer user = GetPlayerActifOnTheServerByIdOrNameIFN(playerIdOrName);
+                BasePlayer user = (BasePlayer)FInstance.AshTools?.Call("GetPlayerActifOnTheServerByIdOrNameIFN", playerIdOrName);
                 if (user != null)
                 {
                     TryLoad(user.userID);
                     return PlayerData.Find(user);
                 }
-                else
-                    FInstance.PrintToConsole($"Le joueur {playerIdOrName} n'existe pas dans la base des joueurs du serveur");
                 return null;
             }
         }
@@ -210,35 +213,6 @@ namespace Oxide.Plugins
         #endregion
 
         #region Method
-        static BasePlayer GetPlayerActifOnTheServerByIdOrNameIFN(string parIdOrName)
-        {
-            IPlayer iPlayer = FInstance.covalence.Players.FindPlayer(parIdOrName);
-
-            if (iPlayer != null && iPlayer is BasePlayer)
-                return iPlayer as BasePlayer;
-
-            // peut etre le nom partiel d'un joueur actif
-            string uppedName = parIdOrName.ToUpper();
-            List<BasePlayer> playerFounds = new List<BasePlayer>();
-            foreach (var player in BasePlayer.activePlayerList)
-            {
-                if (player.displayName.ToUpper().Contains(uppedName))
-                    playerFounds.Add(player);
-            }
-            if (playerFounds.Count == 1)
-                return playerFounds[0];
-
-            // ou le nom partiel d'un joueur endormi
-            foreach (var player in BasePlayer.sleepingPlayerList)
-            {
-                if (player.displayName.ToUpper() == uppedName)
-                    playerFounds.Add(player);
-            }
-            if (playerFounds.Count == 1)
-                return playerFounds[0];
-
-            return null;
-        }
         void RecordHitInfoIFN(BaseCombatEntity parEntity, HitInfo parHitInfo, bool parIsKill = false)
         {
             if (parEntity == null || parHitInfo == null || parHitInfo.Initiator == null)
@@ -256,7 +230,23 @@ namespace Oxide.Plugins
             BasePlayer victim = parEntity.ToPlayer();
             BasePlayer attacker = attackerEntity.ToPlayer();
 
+            // fiter on bot
             if (BasePlayer.FindBot(victim.userID) || BasePlayer.FindBot(attacker.userID))
+                return;
+
+            // filter on self kill
+            if (victim.userID == attacker.userID)
+                return;
+
+            // filter on weapon name invalid
+            if (parHitInfo?.WeaponPrefab?.ShortPrefabName == null)
+                return;
+
+            // filter on hazardous damage
+            if (FConfigFile.FilterHazardousDamage &&
+                (victim.lastDamage == DamageType.Cold || victim.lastDamage == DamageType.ColdExposure || victim.lastDamage == DamageType.Drowned || victim.lastDamage == DamageType.ElectricShock
+                || victim.lastDamage == DamageType.Fall || victim.lastDamage == DamageType.Heat || victim.lastDamage == DamageType.Hunger || victim.lastDamage == DamageType.Poison
+                || victim.lastDamage == DamageType.Radiation || victim.lastDamage == DamageType.RadiationExposure || victim.lastDamage == DamageType.Thirst || victim.lastDamage == DamageType.Suicide))
                 return;
 
             RecordHitInfo(attacker, victim, parHitInfo, parIsKill);
@@ -276,7 +266,7 @@ namespace Oxide.Plugins
             improvedHitInfo.FIdTo = parVictim.userID;
             improvedHitInfo.FNameTo = parVictim.displayName;
             improvedHitInfo.FPositionTo = parVictim.ServerPosition;
-            improvedHitInfo.FWeaponName = parHitInfo?.WeaponPrefab?.ShortPrefabName ?? "NULL";
+            improvedHitInfo.FWeaponName = parHitInfo.WeaponPrefab.ShortPrefabName;
             improvedHitInfo.FDistance = parHitInfo?.ProjectileDistance ?? 0f;
             improvedHitInfo.FDamageType = parVictim.lastDamage;
 
@@ -390,6 +380,14 @@ namespace Oxide.Plugins
         void OnServerInitialized()
         {
             FInstance = this;
+            if (!AshTools)
+            {
+                PrintError("AshTools is not present, this plugins will not works");
+                Unsubscribe("OnEntityTakeDamage");
+                Unsubscribe("OnEntityDeath");
+                return;
+            }
+
             LoadAllPlayers();
             foreach (BasePlayer player in BasePlayer.activePlayerList)
             {
@@ -460,12 +458,12 @@ namespace Oxide.Plugins
         private void cmdListHitInfo(IPlayer parPlayer, string command, string[] args)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1)
+            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1 && AshTools)
             {
                 PlayerData playerData = PlayerData.Find(args[0]);
                 if (playerData != null)
                 {
-                    PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim");
+                    PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim damageType");
                     foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos.OrderByDescending((d) => d.FDate).Take((args.Length >= 2 ? int.Parse(args[1]) : 15)).Reverse())
                         PrintToConsole(player, $"{ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} {ihi.FDamageType.ToString()}");
                 }
@@ -475,7 +473,7 @@ namespace Oxide.Plugins
         private void cmdShowHitInfo(IPlayer parPlayer, string command, string[] args)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1)
+            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1 && AshTools)
             {
                 PlayerData playerData = PlayerData.Find(args[0]);
                 if (playerData != null)
@@ -492,7 +490,7 @@ namespace Oxide.Plugins
                         checkDateTo = true;
 
                     Vector3 currentPosition = player.ServerPosition;
-                    PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim");
+                    PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim damageType");
                     foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos.OrderBy((d) => d.FDate))
                     {
                         if ((Vector3.Distance(currentPosition, ihi.FPositionFrom) < distanceMax || Vector3.Distance(currentPosition, ihi.FPositionTo) < distanceMax) && (!checkDateFrom || DateTime.Compare(ihi.FDate, dateFrom) > 0) && (!checkDateTo || DateTime.Compare(ihi.FDate, dateTo) < 0) && (ihi.FWeaponName != null))
@@ -516,7 +514,7 @@ namespace Oxide.Plugins
         private void cmdShowAllHitInfo(IPlayer parPlayer, string command, string[] args)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (permission.UserHasPermission(player.UserIDString, FPerm))
+            if (permission.UserHasPermission(player.UserIDString, FPerm) && AshTools)
             {
                 uint index = 0;
                 float duration = FConfigFile.DisplayDuration;
@@ -529,43 +527,40 @@ namespace Oxide.Plugins
                 if (args.Length >= 2 && DateTime.TryParseExact(args[1], dateTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateTo))
                     checkDateTo = true;
 
-                List<ImprovedHitInfo> alreadyShown = new List<ImprovedHitInfo>();
+                List<ImprovedHitInfo> ihiFound = new List<ImprovedHitInfo>();
                 Vector3 currentPosition = player.ServerPosition;
-                PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim");
                 foreach (PlayerData playerData in FLoadedPlayerData)
                 {
                     if (playerData.FImprovedHitInfos == null)
                         continue;
 
-                    foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos.OrderBy((d) => d.FDate))
+                    foreach (ImprovedHitInfo ihi in playerData.FImprovedHitInfos)
                     {
-                        ImprovedHitInfo foundIhi = alreadyShown.Find((p) => p.FDate == ihi.FDate && p.FIdFrom == ihi.FIdTo && p.FIdTo == ihi.FIdFrom);
-                        if (foundIhi != null)
+                        if (ihiFound.Find((p) => p.FDate == ihi.FDate && p.FIdFrom == ihi.FIdTo && p.FIdTo == ihi.FIdFrom) != null)
                         {
-                            PrintToConsole($"filter ihi {ihi.FDate} {ihi.FIdFrom} {ihi.FIdTo}, already displayed");
+                            PrintToConsole(player, $"filter ihi {ihi.FDate} {ihi.FIdFrom} {ihi.FIdTo}, already displayed");
                             continue;
                         }
 
                         if ((Vector3.Distance(currentPosition, ihi.FPositionFrom) < distanceMax || Vector3.Distance(currentPosition, ihi.FPositionTo) < distanceMax) && (!checkDateFrom || DateTime.Compare(ihi.FDate, dateFrom) > 0) && (!checkDateTo || DateTime.Compare(ihi.FDate, dateTo) < 0) && (ihi.FWeaponName != null))
-                        {
-                            PrintToConsole(player, $"[{index}] {ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} {ihi.FDamageType.ToString()} ");
-
-                            Color color = ihi.FIdFrom == playerData.FId ? Color.green : Color.red;
-                            Color invertColor = ihi.FIdFrom == playerData.FId ? Color.red : Color.green;
-                            Vector3 wristFrom = ihi.FPositionFrom; wristFrom[1] += 1;
-                            Vector3 wristTo = ihi.FPositionTo; wristTo[1] += 1;
-                            player.SendConsoleCommand("ddraw.arrow", duration, color, wristFrom, wristTo, 0.25);
-                            player.SendConsoleCommand("ddraw.text", duration, color, wristFrom, ihi.FNameFrom);
-                            player.SendConsoleCommand("ddraw.text", duration, invertColor, wristTo, ihi.FNameTo);
-                            player.SendConsoleCommand("ddraw.text", duration, color, (wristFrom + wristTo) / 2, (++index).ToString() + ":-> " + ihi.FWeaponName);
-
-                            alreadyShown.Add(ihi);
-                        }
-                        else
-                        {
-                            // PrintToConsole($"did not match the requirement ({Vector3.Distance(currentPosition, ihi.FPositionFrom)} < {distanceMax} || {Vector3.Distance(currentPosition, ihi.FPositionTo)} < {distanceMax}) && (!{checkDateFrom} || {DateTime.Compare(ihi.FDate, dateFrom)} > 0) && (!{checkDateTo} || {DateTime.Compare(ihi.FDate, dateTo)} < 0) && ({ihi.FWeaponName} != null)");
-                        }
+                            ihiFound.Add(ihi);
                     }
+                }
+
+                PrintToConsole(player, "\nDate idAttacker nameAttacker positionAttacker weapon distance idVictim nameVictim positionVictim damageType");
+                foreach (ImprovedHitInfo ihi in ihiFound.OrderBy((d) => d.FDate))
+                {
+                    PrintToConsole(player, $"[{index}] {ihi.FDate.ToString("dd/MM/yyyy HH:mm:ss.fff")} {ihi.FIdFrom} {ihi.FNameFrom} {ihi.FPositionFrom.ToString().Replace(",", "")} {ihi.FWeaponName} {ihi.FDistance.ToString("F1")}m {ihi.FIdTo} {ihi.FNameTo} {ihi.FPositionTo.ToString().Replace(",", "")} {ihi.FDamageType.ToString()} ");
+
+                    Color color = Color.green;
+                    Color invertColor = Color.red;
+                    Vector3 wristFrom = ihi.FPositionFrom; wristFrom[1] += 1;
+                    Vector3 wristTo = ihi.FPositionTo; wristTo[1] += 1;
+
+                    player.SendConsoleCommand("ddraw.arrow", duration, color, wristFrom, wristTo, 0.25);
+                    player.SendConsoleCommand("ddraw.text", duration, color, wristFrom, ihi.FNameFrom);
+                    player.SendConsoleCommand("ddraw.text", duration, invertColor, wristTo, ihi.FNameTo);
+                    player.SendConsoleCommand("ddraw.text", duration, color, (wristFrom + wristTo) / 2, (++index).ToString() + ":-> " + ihi.FWeaponName);
                 }
             }
         }
@@ -573,7 +568,7 @@ namespace Oxide.Plugins
         private void cmdListKill(IPlayer parPlayer, string command, string[] args)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1)
+            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1 && AshTools)
             {
                 PlayerData playerData = PlayerData.Find(args[0]);
                 if (playerData != null)
@@ -597,7 +592,7 @@ namespace Oxide.Plugins
         private void cmdListKillBy(IPlayer parPlayer, string command, string[] args)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1)
+            if (permission.UserHasPermission(player.UserIDString, FPerm) && args.Length >= 1 && AshTools)
             {
                 PlayerData playerData = PlayerData.Find(args[0]);
                 if (playerData != null)

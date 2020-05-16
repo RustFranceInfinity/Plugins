@@ -1,26 +1,58 @@
-﻿// Requires: AshTools
-
-using Oxide.Core.Libraries.Covalence;
+﻿using Oxide.Core.Libraries.Covalence;
 using Oxide.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
-    [Info("WatchManager", "Ash @ Rust France Infinity", "1.0.0")]
+    [Info("WatchManager", "Ash @ Rust France Infinity", "1.0.3")]
     [Description("Watch manager, track people to watch and inform admin at connection")]
     class WatchManager : RustPlugin
     {
         // Require plugins
-        AshTools FTools;
+        [PluginReference] private Plugin AshTools;
 
         static HashSet<WatchInfo> FPlayerDatas;
         static List<WatchInfo> FWatchWaitingForRemoval;
 
+        // Timers
+        private Timer FTimer;
+        private static ConfigFile FConfigFile;
+
         // Permissions
-        private const string perm = "watchmanager.admin";
+        private const string FPermission = "watchmanager.admin";
         private string Lang(string key, string id = null, params object[] args) => string.Format(lang.GetMessage(key, this, id), args);
+
+        #region Config
+
+        private class ConfigFile
+        {
+            public float RefreshInterval { get; set; }
+            public static ConfigFile DefaultConfig()
+            {
+                return new ConfigFile
+                {
+                    RefreshInterval = 300f,
+                };
+            }
+        }
+
+        protected override void LoadDefaultConfig()
+        {
+            FConfigFile = ConfigFile.DefaultConfig();
+        }
+
+        protected override void LoadConfig()
+        {
+            base.LoadConfig();
+            FConfigFile = Config.ReadObject<ConfigFile>();
+        }
+
+        protected override void SaveConfig() => Config.WriteObject(FConfigFile);
+
+        #endregion
 
         #region Data
 
@@ -37,6 +69,7 @@ namespace Oxide.Plugins
             public string FText;
             public DateTime FDate;
 
+            public DateTime FDateStopWatching;
         }
         #endregion
 
@@ -66,7 +99,7 @@ namespace Oxide.Plugins
                 }
                 catch (Exception)
                 {
-                    BasePlayer playerFound = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parPlayer);
+                    BasePlayer playerFound = (BasePlayer)AshTools?.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parPlayer);
                     if (playerFound != null)
                         data = RetrieveAllWatch(playerFound.UserIDString);
                 }
@@ -107,7 +140,7 @@ namespace Oxide.Plugins
                 return;
             }
 
-            BasePlayer player = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[1].ToUpper());
+            BasePlayer player = (BasePlayer)AshTools?.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[1].ToUpper());
             if (player == null)
             {
                 PrintToConsole(parAdmin, string.Format(lang.GetMessage("DoNotExists", this, parAdmin.UserIDString), parArguments[1]));
@@ -120,32 +153,13 @@ namespace Oxide.Plugins
             DateTime date = TimeZoneInfo.ConvertTime(DateTime.UtcNow, TimeZoneInfo.Local);
 
             // overwrite admin information
+            bool hasDelay = false;
+            DateTime dateWithDelay = date;
             if (argSize > 3)
             {
-                BasePlayer adminPlayer = (BasePlayer)FTools.Call("GetPlayerActifOnTheServerByIdOrNameIFN", parArguments[3].ToUpper());
-                if (adminPlayer != null)
-                {
-                    adminId = adminPlayer.userID;
-                    adminName = adminPlayer.displayName;
-                }
-                else
-                {
-                    adminId = 0;
-                    adminName = parArguments[3];
-                }
-            }
-
-            // overwrite date
-            if (argSize > 4)
-            {
-                try
-                {
-                    DateTime localDate = DateTime.Parse(parArguments[4]);
-                    date = localDate;
-                }
-                catch (Exception)
-                {
-                }
+                float nbDay;
+                if (hasDelay = float.TryParse(parArguments[3], out nbDay))
+                    dateWithDelay = dateWithDelay.AddDays(nbDay);
             }
 
             // create new watch
@@ -160,13 +174,21 @@ namespace Oxide.Plugins
             watchInfo.FAdminName = adminName;
             watchInfo.FWatchId = maxId + 1;
             watchInfo.FDate = date;
+            watchInfo.FDateStopWatching = dateWithDelay;
             watchInfo.FPlayerId = player.userID;
             watchInfo.FPlayerName = player.displayName;
             watchInfo.FPlayerNameUpper = watchInfo.FPlayerName.ToUpper();
             watchInfo.FText = parArguments[2];
 
             FPlayerDatas.Add(watchInfo);
-            PrintToConsole(parAdmin, "Le joueur " + player.displayName + " est maintenant sous surveillance");
+            PrintToConsole(parAdmin, "Le joueur " + player.displayName + " est maintenant sous surveillance" + (DateTime.Compare(watchInfo.FDateStopWatching, watchInfo.FDate) > 0 ? " jusqu'au " + watchInfo.FDateStopWatching.ToString("dd/MM/yyyy HH:mm") : ""));
+
+            // envoie un message à tout les staffs actif en jeu
+            foreach (BasePlayer user in BasePlayer.activePlayerList)
+            {
+                if (user != parAdmin && permission.UserHasPermission(user.UserIDString, FPermission))
+                    PrintToChat(user, "Le joueur " + player.displayName + " a été mis sous surveillance par " + parAdmin.displayName + (watchInfo.FDateStopWatching > watchInfo.FDate ? " jusqu'au " + watchInfo.FDateStopWatching.ToString("dd/MM/yyyy HH:mm") : ""));
+            }
             Save();
         }
 
@@ -241,7 +263,7 @@ namespace Oxide.Plugins
                             currentPlayer = watch.FPlayerName;
                             PrintToConsole(parPlayer, "<color=green>" + watch.FPlayerName + "</color>(" + watch.FPlayerId + ") est sous surveillance pour <color=red>" + FPlayerDatas.ToList().FindAll((p) => p.FPlayerName == watch.FPlayerName).Count + "</color> problème(s)");
                         }
-                        PrintToConsole(parPlayer, "[" + watch.FWatchId + "] Le " + watch.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=green>" + watch.FText + "</color> par " + watch.FAdminName);
+                        PrintToConsole(parPlayer, "<color=red>" + watch.FWatchId + "</color> Le " + watch.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=yellow>" + watch.FText + "</color> par " + watch.FAdminName + (watch.FDateStopWatching > watch.FDate ? " jusqu'au " + watch.FDateStopWatching.ToString("dd/MM/yyyy HH:mm") : ""));
                     }
                 }
                 else if (removed == 0)
@@ -261,7 +283,7 @@ namespace Oxide.Plugins
             if (parArguments.Length == 1)
             {
                 foreach (WatchInfo watch in FPlayerDatas.OrderBy((d) => d.FDate))
-                    PrintToConsole(parPlayer, "<color=green>" + watch.FPlayerName + "</color> (" + watch.FPlayerId + ") [" + watch.FWatchId + "] le " + watch.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=green>" + watch.FText + "</color> par " + watch.FAdminName);
+                    PrintToConsole(parPlayer, "<color=green>" + watch.FPlayerName + "</color> (" + watch.FPlayerId + ") [<color=red>" + watch.FWatchId + "</color>] le " + watch.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=yellow>" + watch.FText + "</color> par " + watch.FAdminName + (watch.FDateStopWatching > watch.FDate ? " jusqu'au " + watch.FDateStopWatching.ToString("dd/MM/yyyy HH:mm") : ""));
             }
             else if (parArguments[1] == "size")
             {
@@ -284,7 +306,7 @@ namespace Oxide.Plugins
                             currentPlayer = watch.FPlayerName;
                             PrintToConsole(parPlayer, "<color=green>" + watch.FPlayerName + "</color>(" + watch.FPlayerId + ") est sous surveillance pour <color=red>" + FPlayerDatas.ToList().FindAll((p) => p.FPlayerName == watch.FPlayerName).Count + "</color> problème(s)");
                         }
-                        PrintToConsole(parPlayer, "[" + watch.FWatchId + "] Le " + watch.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=green>" + watch.FText + "</color> par " + watch.FAdminName);
+                        PrintToConsole(parPlayer, "<color=red>" + watch.FWatchId + "</color> Le " + watch.FDate.ToString("dd/MM/yyyy HH:mm") + " -> <color=yellow>" + watch.FText + "</color> par " + watch.FAdminName + (watch.FDateStopWatching > watch.FDate ? " jusqu'au " + watch.FDateStopWatching.ToString("dd/MM/yyyy HH:mm") : ""));
                     }
                 }
             }
@@ -302,7 +324,7 @@ namespace Oxide.Plugins
                 ["DoNotExists"] = "Player '{0}' do not exists on the server",
                 ["Usage"] = "<color=red>watch</color> [list|add|remove]"
                           + "\n<color=green>\tlist [id|name]: </color> la liste de toutes les surveillance [optionnel, un nom ou id de joueur]"
-                          + "\n<color=green>\tadd <id|name> <motif> [admin] [date]: </color> ajout d'une surveillance concernant un joueur [optionnel: admin et date]"
+                          + "\n<color=green>\tadd <id|name> <motif> [delay]: </color> ajout d'une surveillance concernant un joueur [optionnel: le nombre de jour de watch]"
                           + "\n<color=green>\tremove <id|name> [watchId]:  </color> supprimer un joueur de la liste  [optionnel: juste une surveillance via son id]"
             }, this);
         }
@@ -315,7 +337,7 @@ namespace Oxide.Plugins
             AddCovalenceCommand("watch", "WatchCommand");
 
             // Register permissions for commands
-            permission.RegisterPermission(perm, this);
+            permission.RegisterPermission(FPermission, this);
         }
         #endregion
 
@@ -323,16 +345,34 @@ namespace Oxide.Plugins
 
         void OnServerInitialized()
         {
-            FTools = (AshTools)Manager.GetPlugin("AshTools");
+            if (!AshTools)
+                PrintError("AshTools is not present, this plugins will not works");
 
             LoadDatas();
             FWatchWaitingForRemoval = new List<WatchInfo>();
             foreach (WatchInfo watch in FPlayerDatas)
                 watch.FPlayerNameUpper = watch.FPlayerName.ToUpper();
+
+            FTimer?.Destroy();
+            FTimer = timer.Every(FConfigFile.RefreshInterval, () =>
+            {
+                DateTime currentTime = DateTime.Now;
+                List<WatchInfo> dataToRemove = new List<WatchInfo>();
+                foreach (WatchInfo data in FPlayerDatas)
+                {
+                    if (data.FDateStopWatching > data.FDate && currentTime > data.FDateStopWatching)
+                        dataToRemove.Add(data);
+                }
+                foreach (WatchInfo data in dataToRemove)
+                    FPlayerDatas.Remove(data);
+                if (dataToRemove.Count > 0)
+                    Save();
+            });
         }
+
         void OnPlayerConnected(BasePlayer player)
         {
-            if (permission.UserHasPermission(player.UserIDString, perm))
+            if (permission.UserHasPermission(player.UserIDString, FPermission) && AshTools)
             {
                 string[] args = { "list" };
                 PrintToConsole(player, "Liste des joueurs sous surveillance:");
@@ -346,7 +386,7 @@ namespace Oxide.Plugins
         private void WatchCommand(IPlayer parPlayer, string parCommand, string[] parArguments)
         {
             BasePlayer player = (BasePlayer)parPlayer.Object;
-            if (!permission.UserHasPermission(player.UserIDString, perm))
+            if (!permission.UserHasPermission(player.UserIDString, FPermission) || !AshTools)
                 return;
 
             if (parArguments.Length == 0)

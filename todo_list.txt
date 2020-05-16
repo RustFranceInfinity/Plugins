@@ -1,0 +1,89 @@
+OK - ICL
+	OK - configurer pour temps d'affichage
+	OK - configurer le delai entre sauvegarde
+	OK - permettre de faire un scl_all pour tous les tirs dans une zone de X mètres
+	OK - vérfier pour le coup fatal
+	OK - stocker le nom des joueurs comme pour KDR
+	OK - reprendre le KDR pour les vrais kills
+
+OK - AdminZone
+	OK - faire un toggle
+
+OK - ICL
+	OK - scl_all: faire un prélisting des infos à afficher puis les trier par date avant le vrai affichage
+
+OK - AshTools
+	OK - vérifier que les steam id sont bien prise en compte pour la recherche de gens
+
+OK - GoToSquare
+	OK - pourquoi on meurt en faisant un /tpa
+	
+OK - AdminZone
+	OK - pourquoi le bind azone ne déclenche pas la zone
+	
+- ZoneManager
+	- vérifier que le pvpgod s'applique aussi au tourelle / corriger
+	
+OK - DeathNote
+	OK - rajotue position pour les pieges
+	
+Raid Tracker
+	- détecteur de double raid
+		- stocker les zones taper par joueur
+		- stocker les owner des trucs pété par joueur
+		- croisé les info pour remonter des potentiels double raid
+
+framework
+	OK - config file
+		- modifiable par commande
+			OK - listable
+			OK - identifiable sur un dotted format
+				- gestion des dictionnaire
+			OK - modifiable via dotted format
+				OK - type simple
+				- list
+				- dictionnaire
+			OK - optim1: chargé les dotted info à l'init de la conf (1 seul fois) + remettre à jour uniquement sur modification de la conf
+		- customizable par joueur via customizable menu
+	OK - permission dynamique et customizable via config (cf. config file)
+	OK - langue
+	OK - mode debug activable à la volé (sortie en console, warning; fichier suivant le cas/config)
+	- refaire tous les scripts avec le framework
+	- ajout de gui à l'(ecran
+		- create panel
+		- create button
+		- create label
+		- create icone
+		
+		
+v1 des vue
+	- modo menu
+		- noclip
+		- god
+		- vanish
+		- tp
+		- tpa
+		- icl / scl
+		- combatlog
+		- quit
+
+Customizable Menu
+	- positionnement via config
+	- action / callback par defaut
+		- console command
+		- next / back / quit (OK)
+	- faire une fenetre de presentation
+		- bouton
+			- simple (label + icone (gauche ou droite)
+			- check
+			- radio
+		- label
+		- icone
+		- frame
+		- list
+		- texte
+	- fenetre de configuration de frmae
+		- new frame
+		- load frame
+		- add UI
+		- etc ...

@@ -8,10 +8,11 @@ using Oxide.Core.Plugins;
 using UnityEngine;
 using Oxide.Game.Rust.Cui;
 using Oxide.Core.Libraries.Covalence;
+using Oxide.Game.Rust.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-    [Info("AshTools", "Ash @ Rust France Infinity", "1.0.0")]
+    [Info("AshTools", "Ash @ Rust France Infinity", "1.0.1")]
     [Description("Some tools useful for many plugins")]
 
     class AshTools : RustPlugin
@@ -133,9 +134,8 @@ namespace Oxide.Plugins
                 throw new ArgumentException("idOrName is invalid: " + parIdOrName);
 
             IPlayer iPlayer = covalence.Players.FindPlayer(idOrName);
-
-            if (iPlayer != null && iPlayer is BasePlayer)
-                return iPlayer as BasePlayer;
+            if (iPlayer != null && iPlayer.Object != null && iPlayer.Object is BasePlayer)
+                return iPlayer.Object as BasePlayer;
 
             // peut etre le nom partiel d'un joueur actif
             string uppedName = idOrName.ToUpper();

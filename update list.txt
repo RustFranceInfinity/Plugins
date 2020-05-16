@@ -1,0 +1,84 @@
+30/04/2020 ->
+
+CoordinateToSquare devient AshTools (version 1.0.0)
+
+AshTools (version 1.0.0)
+	- Ajout d'une méthode pour récupérer une joueur à partir de son steamId, de son nom (complet ou partiel), devrait normalement fonctionner aussi avec les joueurs morts et deco
+
+AdminZone (version 1.0.1)
+	- La commande 'azone' ne prends plus de paramètre 'on', 'off' mais devient un interrupteur (/azone pour créer une zone si elle n'existe pas ou la détruire si elle existe)
+	- La commande 'azone' est accessible de la console ou du chat
+	- permission: adminzone.admin
+	- commande
+		- azone [taille] active ou désactive une zone dans laquelle le god mode est actif pour tous les joueurs ([taille] pour changer la taille présente par défaut en config)
+
+AvertoManager (version 1.0.1)
+	- Le plugin AshTools est maintenant nécessaire pour récupérer le nom des gens
+
+GoToSquare (version 1.0.3)
+	- la commande 'tp' est accessible de la console ou du chat
+	- la commande 'tpa' est accessible de la console ou du chat
+
+ImprovedCombatInfo (version 1.0.1)
+	- Le plugin AshTools est maintenant nécessaire pour récupérer le nom des gens
+
+WatchManager (version 1.0.1)
+	- Le plugin AshTools est maintenant nécessaire pour récupérer le nom des gens
+
+
+External plugins
+	DeathNote -> utilisation de AshTools à la place de CoordinateToSquare
+	RaidTracker -> utilisation de AshTools à la place de CoordinateToSquare
+
+
+
+30/04/2020
+WatchManager (version 1.0.2)
+	- Lorsqu'une surveillance est ajoutée, tous les autres admin du plugin qui sont actif en jeu recoivent une notification  par chat
+	- config: ajout de la durée entre chaque vérification pour supprimer une surveillance (par défaut 300s)
+	- commande, ajout de la durée à une surveillance
+		- watch add <nom> <motif> [durée en jour] -> ajouté une surveillance (le joueur n'est pas notifié) [pour un certain nombre de jour (0.5: 12h, etc...)]
+
+
+01/05/2020
+AshTools (version 1.0.1)
+	- utilisation du Covalence pour récupérer des joueurs potentiellement dans l'entre deux mondes (mort mais pas sleeping)
+
+
+01/05/2020
+ImprovedCombatLog (version 1.0.2)
+	- Ajout d'un flag de configuration (FilterHazardousDamage par défaut à true) permettant de ne pas prendre en compte les dégats lié à l'environnement (Faim, Poison, Froid, Rad ...)
+	- commande
+		- scl_all: maintenant, toutes les informations sont préchargé puis triés par date avant l'afficahge (auparavant, le tri par date était fait joueur par joueur et non pas globalement)
+
+
+02/05/2020
+AvertoManager (version 1.0.2)
+	- passage de AshTools en dépendance plutot qu'en require pour gagner en temps serveur lors du chargement
+
+02/05/2020
+GoToSquare (version 1.0.4)
+	- passage de AshTools en dépendance plutot qu'en require pour gagner en temps serveur lors du chargement
+
+02/05/2020
+ImprovedCombatInfo (version 1.0.3)
+	- passage de AshTools en dépendance plutot qu'en require pour gagner en temps serveur lors du chargement
+
+02/05/2020
+WatchManager (version 1.0.3)
+	- passage de AshTools en dépendance plutot qu'en require pour gagner en temps serveur lors du chargement
+
+07/05/2020
+GoToSquare (version 1.0.5)
+	- passage dans le fichier de config de la hauteur d'apparition lors du tp à une case (par défaut 0f)
+
+10/05/2020
+AdminZone (version 1.0.2)
+	- La commande 'azone' est maintenant bindable
+
+16/05/2020
+ZoneManger (version 3.0.12)
+	- les traps ne font plus de degats lorsque le flag pvpGod est actif
+	ajout des 2 lignes suivantes lignes 327 et 328 (à la fin du test des exclusions pvpGod/pveGod dans le hook OnEntityTakeDamages)
+	                else if (HasPlayerFlag(victim, ZoneFlags.PvpGod, false))
+                    return true;
